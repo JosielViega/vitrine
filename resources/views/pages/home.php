@@ -7,27 +7,36 @@ $formatPrice = static fn (float $price): string => 'R$ ' . number_format($price,
 ?>
 <section class="intro">
     <div class="container intro-content">
-        <div>
+        <div class="hero-copy">
+            <h1 class="sr-only">Bar e Lanchonete São Jorge</h1>
             <p class="status <?= $menu['isOpen'] ? 'is-open' : 'is-closed' ?>">
                 <span aria-hidden="true"></span><?= $menu['isOpen'] ? 'Aberto agora' : 'Fechado agora' ?>
             </p>
-            <h1>Bar e Lanchonete<br><span>São Jorge</span></h1>
-            <p class="intro-copy">Porções caprichadas, bebida gelada e aquele clima de encontro.</p>
+            <p class="hero-tagline">Boa comida<br><span>reúne boas pessoas!</span></p>
         </div>
         <div class="service-card" aria-label="Informações de atendimento">
-            <p><span aria-hidden="true">◷</span><strong>Quinta, sexta e sábado</strong><small>Das 17h às 21h30</small></p>
-            <p><span aria-hidden="true">⌖</span><strong>Consumo no local ou retirada</strong><small>Não fazemos entregas.</small></p>
+            <p>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                <strong>Quinta, sexta e sábado</strong><small>Das 17h às 21h30</small>
+            </p>
+            <p>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                <strong>Consumo no local ou retirada</strong><small>Não fazemos entregas.</small>
+            </p>
         </div>
-        <a class="primary-link" href="#cardapio">Ver cardápio <span aria-hidden="true">↓</span></a>
+        <a class="primary-link" href="#cardapio">Ver cardápio
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </a>
     </div>
 </section>
 
 <section class="menu" id="cardapio" aria-labelledby="menu-title">
     <div class="container">
         <div class="menu-heading">
-            <div><p class="eyebrow">Escolha com calma</p><h2 id="menu-title">Nosso cardápio</h2></div>
+            <h2 class="sr-only" id="menu-title">Nosso cardápio</h2>
             <label class="search">
-                <span class="sr-only">Buscar no cardápio</span><span aria-hidden="true">⌕</span>
+                <span class="sr-only">Buscar no cardápio</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/></svg>
                 <input id="menu-search" type="search" placeholder="Buscar no cardápio..." autocomplete="off">
             </label>
         </div>
@@ -63,7 +72,9 @@ $formatPrice = static fn (float $price): string => 'R$ ' . number_format($price,
     <div class="cart-sheet">
         <header class="cart-header">
             <div><p class="eyebrow">Seu pedido</p><h2 id="cart-title">Revise os itens</h2></div>
-            <button class="icon-button" id="cart-close" type="button" aria-label="Fechar pedido">×</button>
+            <button class="icon-button" id="cart-close" type="button" aria-label="Fechar pedido">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+            </button>
         </header>
         <div class="cart-items" id="cart-items"></div>
         <div class="cart-summary">

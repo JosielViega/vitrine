@@ -13,11 +13,13 @@ declare(strict_types=1);
         </div>
         <div class="service-card">
             <p>
-                <span aria-hidden="true">⌖</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
                 <strong>Caminho solicitado</strong>
                 <small><code><?= e($path) ?></code></small>
             </p>
         </div>
-        <a class="primary-link" href="/">Voltar ao cardápio <span aria-hidden="true">→</span></a>
+        <a class="primary-link" href="/">Voltar ao cardápio
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
     </div>
 </section>
