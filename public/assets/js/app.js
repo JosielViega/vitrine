@@ -2,163 +2,237 @@
 
 document.documentElement.classList.add('js');
 
-function initStorefront() {
-    if (!document.querySelector('#cardapio')) return;
+const CART_KEY = 'saoJorgeCart';
+const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
-    const cards = [...document.querySelectorAll('[data-product-card]')];
-    const sections = [...document.querySelectorAll('[data-category]')];
-    const categoryLinks = [...document.querySelectorAll('[data-category-link]')];
-    const searchInput = document.querySelector('#menu-search');
-    const emptyState = document.querySelector('#search-empty');
-    const cartBar = document.querySelector('#cart-bar');
-    const cartDialog = document.querySelector('#cart-dialog');
-    const cartItems = document.querySelector('#cart-items');
-    const cartSubtotal = document.querySelector('#cart-subtotal');
-    const checkoutNotice = document.querySelector('#checkout-notice');
-    const toast = document.querySelector('#toast');
-    const cart = new Map();
-    const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-    let toastTimer;
-
-    function normalizeText(value) {
-        return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+function loadCart() {
+    try {
+        const stored = JSON.parse(window.localStorage.getItem(CART_KEY) || '[]');
+        if (!Array.isArray(stored)) return [];
+        return stored.filter((item) => item && typeof item.key === 'string' && typeof item.name === 'string' && Number.isFinite(item.price) && Number.isInteger(item.quantity))
+            .map((item) => ({
+                key: item.key,
+                id: String(item.id || ''),
+                name: item.name,
+                variantId: String(item.variantId || ''),
+                variantLabel: String(item.variantLabel || ''),
+                price: Number(item.price),
+                quantity: Math.max(1, item.quantity),
+                notes: String(item.notes || '').slice(0, 180),
+                image: String(item.image || '').startsWith('/assets/images/') ? item.image : '',
+            }));
+    } catch {
+        return [];
     }
+}
 
-    function showToast(message) {
-        window.clearTimeout(toastTimer);
-        toast.textContent = message;
-        toast.classList.add('is-visible');
-        toastTimer = window.setTimeout(() => toast.classList.remove('is-visible'), 1800);
-    }
+function saveCart(cart) {
+    window.localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    updateCartIndicators(cart);
+}
 
-    function updateActiveCategory(activeId) {
-        categoryLinks.forEach((link) => {
-            const isActive = link.dataset.categoryLink === activeId;
-            link.classList.toggle('is-active', isActive);
-            if (isActive) link.setAttribute('aria-current', 'true');
+function cartCount(cart) {
+    return cart.reduce((total, item) => total + item.quantity, 0);
+}
+
+function updateCartIndicators(cart = loadCart()) {
+    const count = cartCount(cart);
+    document.querySelectorAll('[data-cart-count]').forEach((badge) => {
+        badge.textContent = String(count);
+        badge.hidden = count === 0;
+    });
+}
+
+function normalizeText(value) {
+    return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+function showToast(message) {
+    const toast = document.querySelector('[data-toast]');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add('is-visible');
+    window.setTimeout(() => toast.classList.remove('is-visible'), 1800);
+}
+
+function initMenu() {
+    const menu = document.querySelector('[data-page="menu"]');
+    if (!menu) return;
+    const cards = [...menu.querySelectorAll('[data-product-row]')];
+    const sections = [...menu.querySelectorAll('[data-category]')];
+    const links = [...menu.querySelectorAll('[data-category-link]')];
+    const search = menu.querySelector('#menu-search');
+    const empty = menu.querySelector('#search-empty');
+
+    function setActive(id) {
+        links.forEach((link) => {
+            const active = link.dataset.categoryLink === id;
+            link.classList.toggle('is-active', active);
+            if (active) link.setAttribute('aria-current', 'true');
             else link.removeAttribute('aria-current');
         });
     }
 
-    function renderCart() {
-        cartItems.replaceChildren();
-        let count = 0;
-        let subtotal = 0;
-
-        cart.forEach((item, key) => {
-            count += item.quantity;
-            subtotal += item.price * item.quantity;
-            const row = document.createElement('article');
-            row.className = 'cart-item';
-
-            const title = document.createElement('h3');
-            title.textContent = item.name;
-            if (item.variantLabel) {
-                const variant = document.createElement('small');
-                variant.textContent = item.variantLabel;
-                title.append(variant);
-            }
-
-            const price = document.createElement('strong');
-            price.textContent = currency.format(item.price * item.quantity);
-            const quantity = document.createElement('div');
-            quantity.className = 'quantity';
-            const decrease = document.createElement('button');
-            decrease.type = 'button';
-            decrease.textContent = '−';
-            decrease.setAttribute('aria-label', `Diminuir quantidade de ${item.name}`);
-            decrease.addEventListener('click', () => changeQuantity(key, -1));
-            const amount = document.createElement('strong');
-            amount.textContent = String(item.quantity);
-            const increase = document.createElement('button');
-            increase.type = 'button';
-            increase.textContent = '+';
-            increase.setAttribute('aria-label', `Aumentar quantidade de ${item.name}`);
-            increase.addEventListener('click', () => changeQuantity(key, 1));
-            quantity.append(decrease, amount, increase);
-
-            const remove = document.createElement('button');
-            remove.type = 'button';
-            remove.className = 'remove-item';
-            remove.textContent = 'Remover';
-            remove.setAttribute('aria-label', `Remover ${item.name} do pedido`);
-            remove.addEventListener('click', () => {
-                cart.delete(key);
-                renderCart();
-                showToast(`${item.name} removido`);
-            });
-            row.append(title, price, quantity, remove);
-            cartItems.append(row);
-        });
-
-        document.querySelector('#cart-bar-count').textContent = String(count);
-        document.querySelector('#cart-bar-label').textContent = count === 1 ? 'item' : 'itens';
-        document.querySelector('#cart-bar-total').textContent = currency.format(subtotal);
-        cartSubtotal.textContent = currency.format(subtotal);
-        cartBar.hidden = count === 0;
-        checkoutNotice.hidden = true;
-        if (count === 0 && cartDialog.open) cartDialog.close();
-    }
-
-    function changeQuantity(key, difference) {
-        const item = cart.get(key);
-        if (!item) return;
-        item.quantity += difference;
-        if (item.quantity <= 0) cart.delete(key);
-        renderCart();
-    }
-
-    cards.forEach((card) => {
-        card.querySelector('[data-add-product]').addEventListener('click', () => {
-            const variant = card.querySelector('input[type="radio"]:checked') || card.querySelector('[data-single-variant]');
-            const variantId = variant.value;
-            const key = `${card.dataset.productId}:${variantId}`;
-            const existing = cart.get(key);
-            if (existing) existing.quantity += 1;
-            else cart.set(key, {
-                name: card.dataset.productName,
-                variantLabel: variant.dataset.variantLabel,
-                price: Number(variant.dataset.price),
-                quantity: 1,
-            });
-            renderCart();
-            showToast(`${card.dataset.productName} adicionado`);
-        });
-    });
-
-    searchInput.addEventListener('input', () => {
-        const query = normalizeText(searchInput.value);
-        let visibleCards = 0;
+    search.addEventListener('input', () => {
+        const query = normalizeText(search.value);
+        let visibleCount = 0;
         cards.forEach((card) => {
             const visible = normalizeText(card.dataset.searchName).includes(query);
             card.hidden = !visible;
-            if (visible) visibleCards += 1;
+            if (visible) visibleCount += 1;
         });
         sections.forEach((section) => {
-            section.hidden = !section.querySelector('[data-product-card]:not([hidden])');
+            section.hidden = !section.querySelector('[data-product-row]:not([hidden])');
         });
-        emptyState.hidden = visibleCards > 0;
+        empty.hidden = visibleCount > 0;
     });
 
-    categoryLinks.forEach((link) => link.addEventListener('click', () => updateActiveCategory(link.dataset.categoryLink)));
+    links.forEach((link) => link.addEventListener('click', () => setActive(link.dataset.categoryLink)));
     if ('IntersectionObserver' in window) {
         const observer = new IntersectionObserver((entries) => {
-            const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-            if (visible) updateActiveCategory(visible.target.id);
-        }, { rootMargin: '-20% 0px -65% 0px', threshold: [0, .25, .5] });
+            const visible = entries.find((entry) => entry.isIntersecting);
+            if (visible) setActive(visible.target.id);
+        }, { rootMargin: '-25% 0px -65% 0px' });
         sections.forEach((section) => observer.observe(section));
     }
-    updateActiveCategory(sections[0]?.id);
+    setActive(window.location.hash.slice(1) || sections[0]?.id);
+}
 
-    cartBar.addEventListener('click', () => cartDialog.showModal());
-    document.querySelector('#cart-close').addEventListener('click', () => cartDialog.close());
-    cartDialog.addEventListener('click', (event) => {
-        if (event.target === cartDialog) cartDialog.close();
+function initProduct() {
+    const form = document.querySelector('[data-product-detail]');
+    if (!form) return;
+    const output = form.querySelector('[data-quantity]');
+    let quantity = 1;
+
+    form.querySelector('[data-quantity-minus]').addEventListener('click', () => {
+        quantity = Math.max(1, quantity - 1);
+        output.textContent = String(quantity);
     });
-    document.querySelector('#checkout-button').addEventListener('click', () => {
-        checkoutNotice.hidden = false;
-        checkoutNotice.focus?.();
+    form.querySelector('[data-quantity-plus]').addEventListener('click', () => {
+        quantity += 1;
+        output.textContent = String(quantity);
+    });
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const variant = form.querySelector('input[name="variant"]:checked');
+        const notes = form.querySelector('[data-notes]').value.trim();
+        const key = `${form.dataset.productId}:${variant.value}:${normalizeText(notes)}`;
+        const cart = loadCart();
+        const existing = cart.find((item) => item.key === key);
+        if (existing) existing.quantity += quantity;
+        else cart.push({
+            key,
+            id: form.dataset.productId,
+            name: form.dataset.productName,
+            variantId: variant.value,
+            variantLabel: variant.dataset.label,
+            price: Number(variant.dataset.price),
+            quantity,
+            notes,
+            image: form.dataset.productImage,
+        });
+        saveCart(cart);
+        showToast(`${form.dataset.productName} adicionado`);
+        window.setTimeout(() => { window.location.href = '/pedido'; }, 250);
     });
 }
 
-initStorefront();
+function createQuantityButton(label, symbol, action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = symbol;
+    button.setAttribute('aria-label', label);
+    button.addEventListener('click', action);
+    return button;
+}
+
+function initOrder() {
+    const screen = document.querySelector('[data-page="order"]');
+    if (!screen) return;
+    const list = screen.querySelector('[data-order-items]');
+    const empty = screen.querySelector('[data-empty-order]');
+    const subtotal = screen.querySelector('[data-order-subtotal]');
+    const total = screen.querySelector('[data-order-total]');
+    const checkout = screen.querySelector('[data-checkout]');
+    const notice = screen.querySelector('[data-checkout-notice]');
+    let cart = loadCart();
+
+    function render() {
+        list.replaceChildren();
+        cart.forEach((item) => {
+            const row = document.createElement('article');
+            row.className = 'order-item';
+            const image = document.createElement('img');
+            image.src = item.image;
+            image.alt = '';
+            image.width = 62;
+            image.height = 62;
+            const copy = document.createElement('div');
+            copy.className = 'order-item-copy';
+            const name = document.createElement('h2');
+            name.textContent = item.name;
+            const variant = document.createElement('p');
+            variant.textContent = item.variantLabel || 'Porção';
+            const price = document.createElement('strong');
+            price.textContent = currency.format(item.price * item.quantity);
+            copy.append(name, variant, price);
+            if (item.notes) {
+                const notes = document.createElement('small');
+                notes.textContent = item.notes;
+                copy.append(notes);
+            }
+            const controls = document.createElement('div');
+            controls.className = 'order-item-controls';
+            controls.append(
+                createQuantityButton(`Diminuir quantidade de ${item.name}`, '−', () => change(item.key, -1)),
+                Object.assign(document.createElement('strong'), { textContent: String(item.quantity) }),
+                createQuantityButton(`Aumentar quantidade de ${item.name}`, '+', () => change(item.key, 1)),
+            );
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'remove-order-item';
+            remove.setAttribute('aria-label', `Remover ${item.name} do pedido`);
+            remove.innerText = 'Remover';
+            remove.addEventListener('click', () => {
+                cart = cart.filter((candidate) => candidate.key !== item.key);
+                persistAndRender();
+                showToast(`${item.name} removido`);
+            });
+            row.append(image, copy, controls, remove);
+            list.append(row);
+        });
+        const value = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        subtotal.textContent = currency.format(value);
+        total.textContent = currency.format(value);
+        empty.hidden = cart.length > 0;
+        checkout.disabled = cart.length === 0;
+        notice.hidden = true;
+    }
+
+    function persistAndRender() {
+        saveCart(cart);
+        render();
+    }
+
+    function change(key, difference) {
+        const item = cart.find((candidate) => candidate.key === key);
+        if (!item) return;
+        item.quantity += difference;
+        if (item.quantity <= 0) cart = cart.filter((candidate) => candidate.key !== key);
+        persistAndRender();
+    }
+
+    screen.querySelector('[data-clear-cart]').addEventListener('click', () => {
+        cart = [];
+        persistAndRender();
+        showToast('Pedido limpo');
+    });
+    checkout.addEventListener('click', () => { notice.hidden = false; });
+    render();
+}
+
+updateCartIndicators();
+initMenu();
+initProduct();
+initOrder();

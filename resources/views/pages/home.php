@@ -2,87 +2,64 @@
 
 declare(strict_types=1);
 
-/** @var array{isOpen: bool, categories: array<string, string>, products: array<int, array<string, mixed>>} $menu */
+/** @var array<string, mixed> $menu */
+/** @var array<string, mixed> $featured */
+/** @var list<array<string, mixed>> $popular */
 $formatPrice = static fn (float $price): string => 'R$ ' . number_format($price, 2, ',', '.');
+$logoSize = 'large';
+$topbarTitle = null;
+$topbarBackHref = '/cardapio';
+$topbarOverlay = true;
+$activeNav = 'home';
 ?>
-<section class="intro">
-    <div class="container intro-content">
-        <div class="hero-copy">
-            <h1 class="sr-only">Bar e Lanchonete São Jorge</h1>
-            <p class="status <?= $menu['isOpen'] ? 'is-open' : 'is-closed' ?>">
-                <span aria-hidden="true"></span><?= $menu['isOpen'] ? 'Aberto agora' : 'Fechado agora' ?>
-            </p>
-            <p class="hero-tagline">Boa comida<br><span>reúne boas pessoas!</span></p>
+<div class="screen home-screen" data-page="home">
+    <section class="home-hero">
+        <img class="home-hero-photo" src="/assets/images/storefront/hero-shrimp-placeholder.jpg" alt="Porção de camarão com batatas" width="1280" height="853">
+        <div class="hero-shade" aria-hidden="true"></div>
+        <?php require dirname(__DIR__) . '/components/topbar.php'; ?>
+        <div class="home-brand"><?php require dirname(__DIR__) . '/components/logo.php'; ?></div>
+        <div class="home-hero-content">
+            <?php require dirname(__DIR__) . '/components/service-info.php'; ?>
+            <p class="home-slogan">Boa comida<br><span>reúne boas pessoas!</span></p>
         </div>
-        <div class="service-card" aria-label="Informações de atendimento">
-            <p>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-                <strong>Quinta, sexta e sábado</strong><small>Das 17h às 21h30</small>
-            </p>
-            <p>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
-                <strong>Consumo no local ou retirada</strong><small>Não fazemos entregas.</small>
-            </p>
-        </div>
-        <a class="primary-link" href="#cardapio">Ver cardápio
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </section>
+
+    <nav class="home-categories" aria-label="Atalhos do cardápio">
+        <?php foreach ($menu['categories'] as $slug => $label): ?>
+            <a href="/cardapio#<?= e($slug) ?>">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <?php if ($slug === 'porcoes'): ?><path d="M5 4v7M8 4v7M5 8h3M6.5 11v9M16 4v16M16 4c4 3 4 7 0 10"/>
+                    <?php elseif ($slug === 'bebidas'): ?><path d="M7 3h10l-1 18H8L7 3ZM8 8h8"/>
+                    <?php else: ?><path d="M8 3h8l2 18H6L8 3ZM7 9h10M11 3l3 6"/><?php endif; ?>
+                </svg><span><?= e($label) ?></span>
+            </a>
+        <?php endforeach; ?>
+    </nav>
+
+    <div class="home-content">
+        <section aria-labelledby="featured-title">
+            <div class="section-heading"><h2 id="featured-title">Destaque da casa</h2></div>
+            <a class="featured-card" href="/produto/<?= e($featured['id']) ?>">
+                <img src="<?= e($featured['image']) ?>" alt="" width="720" height="420">
+                <span class="featured-shade" aria-hidden="true"></span>
+                <span class="featured-copy"><strong><?= e($featured['name']) ?></strong><small><?= e($featured['description']) ?></small><b><?= e($formatPrice(max(array_column($featured['variants'], 'price')))) ?></b></span>
+                <span class="round-add" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+            </a>
+        </section>
+
+        <section aria-labelledby="popular-title">
+            <div class="section-heading"><h2 id="popular-title">Mais pedidos</h2></div>
+            <div class="popular-grid">
+                <?php foreach ($popular as $product): ?><?php require dirname(__DIR__) . '/components/product-card.php'; ?><?php endforeach; ?>
+            </div>
+        </section>
+
+        <a class="drinks-banner" href="/cardapio#bebidas">
+            <img src="/assets/images/storefront/drinks-placeholder.jpg" alt="Bebidas geladas" width="1280" height="720" loading="lazy">
+            <span>Bebidas geladas<small>para bons momentos!</small></span>
         </a>
     </div>
-</section>
 
-<section class="menu" id="cardapio" aria-labelledby="menu-title">
-    <div class="container">
-        <div class="menu-heading">
-            <h2 class="sr-only" id="menu-title">Nosso cardápio</h2>
-            <label class="search">
-                <span class="sr-only">Buscar no cardápio</span>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/></svg>
-                <input id="menu-search" type="search" placeholder="Buscar no cardápio..." autocomplete="off">
-            </label>
-        </div>
-        <nav class="category-nav" aria-label="Categorias do cardápio">
-            <?php foreach ($menu['categories'] as $slug => $label): ?>
-                <a href="#<?= e($slug) ?>" data-category-link="<?= e($slug) ?>"><?= e($label) ?></a>
-            <?php endforeach; ?>
-        </nav>
-        <p class="search-empty" id="search-empty" role="status" hidden>Nenhum item encontrado. Tente buscar por outro nome.</p>
-        <?php foreach ($menu['categories'] as $categorySlug => $categoryLabel): ?>
-            <section class="menu-section" id="<?= e($categorySlug) ?>" data-category="<?= e($categorySlug) ?>" aria-labelledby="title-<?= e($categorySlug) ?>">
-                <div class="section-title">
-                    <h3 id="title-<?= e($categorySlug) ?>"><?= e($categoryLabel) ?></h3>
-                    <span><?= count(array_filter($menu['products'], static fn (array $product): bool => $product['category'] === $categorySlug)) ?> opções</span>
-                </div>
-                <div class="product-grid">
-                    <?php foreach ($menu['products'] as $product): ?>
-                        <?php if ($product['category'] === $categorySlug): ?>
-                            <?php require dirname(__DIR__) . '/components/product-card.php'; ?>
-                        <?php endif; ?>
-                    <?php endforeach; ?>
-                </div>
-            </section>
-        <?php endforeach; ?>
-    </div>
-</section>
-
-<button class="cart-bar" id="cart-bar" type="button" aria-controls="cart-dialog" hidden>
-    <span class="cart-count"><strong id="cart-bar-count">0</strong> <span id="cart-bar-label">itens</span></span>
-    <span>Ver pedido</span><strong id="cart-bar-total">R$ 0,00</strong>
-</button>
-<dialog class="cart-dialog" id="cart-dialog" aria-labelledby="cart-title">
-    <div class="cart-sheet">
-        <header class="cart-header">
-            <div><p class="eyebrow">Seu pedido</p><h2 id="cart-title">Revise os itens</h2></div>
-            <button class="icon-button" id="cart-close" type="button" aria-label="Fechar pedido">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
-            </button>
-        </header>
-        <div class="cart-items" id="cart-items"></div>
-        <div class="cart-summary">
-            <p><span>Subtotal</span><strong id="cart-subtotal">R$ 0,00</strong></p>
-            <small>Pedido para consumo no local ou retirada. Não fazemos entregas.</small>
-            <button class="checkout-button" id="checkout-button" type="button">Finalizar pelo WhatsApp</button>
-            <p class="checkout-notice" id="checkout-notice" role="status" hidden>Finalização pelo WhatsApp será conectada na próxima etapa.</p>
-        </div>
-    </div>
-</dialog>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <?php require dirname(__DIR__) . '/components/bottom-nav.php'; ?>
+    <div class="toast" data-toast role="status" aria-live="polite"></div>
+</div>

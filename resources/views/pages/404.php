@@ -18,7 +18,7 @@ declare(strict_types=1);
                 <small><code><?= e($path) ?></code></small>
             </p>
         </div>
-        <a class="primary-link" href="/">Voltar ao cardápio
+        <a class="primary-link" href="/cardapio">Voltar ao cardápio
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
     </div>

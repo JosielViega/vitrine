@@ -1,6 +1,6 @@
 # Bar e Lanchonete São Jorge — Vitrine
 
-Vitrine e cardápio digital público da Bar e Lanchonete São Jorge. A aplicação permite consultar porções, bebidas e acréscimos, escolher tamanhos e montar um pedido no navegador. A finalização via WhatsApp será integrada em uma etapa futura.
+Vitrine e cardápio digital público da Bar e Lanchonete São Jorge. A aplicação permite consultar porções, bebidas e sucos, escolher tamanhos e montar um pedido no navegador. A finalização via WhatsApp será integrada em uma etapa futura.
 
 O atendimento é destinado a consumo no local ou retirada no estabelecimento. Não há delivery.
 
@@ -41,16 +41,20 @@ composer check
 ## Estado atual
 
 - A vitrine pública responsiva está implementada.
-- Busca, categorias e variantes de tamanho funcionam no navegador.
+- Home promocional, cardápio compacto, detalhe do produto e pedido têm telas próprias.
+- Busca, filtros por categoria, variantes, quantidades e observações funcionam no navegador.
 - Produtos e status de funcionamento são mockados em `config/menu.php`.
-- O carrinho existe apenas em memória no JavaScript e é perdido ao recarregar.
+- O pedido é salvo localmente no navegador com `localStorage`.
 - O banco de dados ainda não está conectado ao cardápio.
 - O botão de finalização é demonstrativo e o WhatsApp ainda não está integrado.
 - Não há envio de pedido nem delivery.
 
 ## Rotas
 
-- `GET /` — vitrine e cardápio público.
+- `GET /` — home promocional.
+- `GET /cardapio` — cardápio completo com busca e categorias.
+- `GET /produto/{slug}` — escolha de tamanho, quantidade e observações.
+- `GET /pedido` — revisão do pedido persistido no navegador.
 - `GET /health` — verificação de saúde sem detalhes internos.
 - Demais caminhos — página pública 404 com o status HTTP correto.
 
