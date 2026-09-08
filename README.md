@@ -1,154 +1,105 @@
-# Modelo PHP
+# Bar e Lanchonete São Jorge — Vitrine
 
-Starter reutilizável para aplicações web tradicionais em PHP. Ele oferece uma base pequena, organizada e segura sem framework, ORM, Node.js ou Docker obrigatório. O código privilegia responsabilidades explícitas e é adequado a Apache, MySQL/MariaDB e hospedagem compartilhada.
+Vitrine e cardápio digital público da Bar e Lanchonete São Jorge. A aplicação permite consultar porções, bebidas e acréscimos, escolher tamanhos e montar um pedido no navegador. A finalização via WhatsApp será integrada em uma etapa futura.
+
+O atendimento é destinado a consumo no local ou retirada no estabelecimento. Não há delivery.
 
 ## Stack
 
-- PHP 8.2 ou superior, PDO MySQL e Composer 2
-- MySQL 8+ ou MariaDB compatível
-- Apache com `mod_rewrite` e `.htaccess`
+- PHP 8.2 ou superior e Composer 2
+- MySQL/MariaDB como futura fonte de dados real
 - HTML5, CSS3 e JavaScript puro
+- Apache com `mod_rewrite` e `.htaccess`
+- Hospedagem compartilhada HostGator/cPanel
 
-## Composer
+O projeto não utiliza framework PHP, framework front-end, Node.js ou bundler. O namespace `App\` usa PSR-4 em `app/`.
 
-Composer é obrigatório desde o primeiro dia. Há um único `vendor/` na raiz, ignorado pelo Git, e o namespace `App\` usa PSR-4 em `app/`. As dependências são `vlucas/phpdotenv` em produção e PHPUnit em desenvolvimento.
-
-## Instalação
+## Desenvolvimento local
 
 ```bash
-git clone https://github.com/JosielViega/modeloPHP.git
-cd modeloPHP
 composer install
 composer setup
-```
-
-`composer setup` cria `.env` a partir do exemplo somente quando ele não existe, escolhe uma porta local livre e não reservada por outro projeto, grava a reserva local e atualiza o autoload. Um `.env` existente é preservado; quando necessário, somente `APP_PORT` e uma `APP_URL` local podem ser ajustados.
-
-Também é possível criar o arquivo local de ambiente manualmente:
-
-```powershell
-copy .env.example .env
-```
-
-No Linux/macOS:
-
-```bash
-cp .env.example .env
-```
-
-Preencha as configurações locais. Regenere o autoload quando criar classes:
-
-```bash
-composer dump-autoload
-```
-
-O `.env` contém valores locais e nunca deve ser versionado.
-
-## Porta local
-
-Cada projeto recebe uma porta própria. O setup combina duas proteções: a porta não pode estar reservada para outro projeto desligado nem ocupada por um listener ativo. As reservas ficam somente na máquina local em `~/.modeloPHP/ports.json` (no Windows, dentro do perfil do usuário).
-
-```env
-APP_URL=http://localhost:8010
-APP_PORT=8010
-```
-
-`composer serve` valida a faixa, confere divergências com o registro e testa o listener antes de iniciar. Se estiver ocupada, o comando termina sem encerrar o processo existente. Consulte [desenvolvimento local](docs/LOCAL_DEVELOPMENT.md).
-
-## Iniciar a aplicação
-
-```bash
 composer serve
 ```
 
-Acesse o endereço mostrado pelo comando. O servidor embutido é apenas uma conveniência local; Apache é o ambiente esperado em produção.
+`composer setup` cria o `.env` a partir de `.env.example` somente quando necessário, seleciona uma porta local livre e atualiza o autoload. Um `.env` já existente é preservado. O arquivo contém configuração local e nunca deve ser versionado.
 
-## Comandos de qualidade
+O endereço da aplicação é exibido por `composer serve`. O servidor PHP embutido é apenas para desenvolvimento; o ambiente esperado em produção é Apache.
+
+Mais detalhes estão em [desenvolvimento local](docs/LOCAL_DEVELOPMENT.md).
+
+## Qualidade
 
 ```bash
 composer test
 composer lint
 composer check
-composer port:status
-composer port:release
 ```
 
-`port:status` mostra somente a reserva e configuração do projeto atual. `port:release` libera somente sua reserva, sem alterar `.env` ou processos.
+`composer check` valida o `composer.json`, verifica a sintaxe dos arquivos PHP e executa os testes automatizados.
 
-`composer check` executa `composer validate --strict`, valida a sintaxe dos arquivos PHP próprios e roda os testes. Para migrations SQL:
+## Estado atual
 
-```bash
-composer migrate
+- A vitrine pública responsiva está implementada.
+- Busca, categorias e variantes de tamanho funcionam no navegador.
+- Produtos e status de funcionamento são mockados em `config/menu.php`.
+- O carrinho existe apenas em memória no JavaScript e é perdido ao recarregar.
+- O banco de dados ainda não está conectado ao cardápio.
+- O botão de finalização é demonstrativo e o WhatsApp ainda não está integrado.
+- Não há envio de pedido nem delivery.
+
+## Rotas
+
+- `GET /` — vitrine e cardápio público.
+- `GET /health` — verificação de saúde sem detalhes internos.
+- Demais caminhos — página pública 404 com o status HTTP correto.
+
+As rotas ficam em `routes/web.php` e seguem o fluxo `Router → Controller → View → Layout`.
+
+## Estrutura
+
+```text
+app/                 Núcleo e controllers
+bootstrap/app.php    Composição e inicialização
+config/              Ambiente e cardápio temporário
+database/            Estrutura para migrations e seeds futuros
+docs/                Arquitetura, segurança e ambiente local
+public/              Document Root e assets públicos
+resources/views/     Layouts, componentes e páginas PHP
+routes/web.php       Rotas HTTP
+storage/             Cache e logs locais
+tests/               Testes automatizados
+bin/                 Comandos do projeto
+deploy/hostgator/     Configuração do mirror de produção
 ```
 
-Para gerar uma pasta local pronta para atualização manual em hospedagem compartilhada:
+## Banco de dados
+
+`App\Core\Database` disponibiliza PDO com prepared statements nativos e `utf8mb4`. As credenciais vêm exclusivamente do ambiente. A futura integração do cardápio deverá substituir os dados de `config/menu.php` sem inserir SQL nas views ou no controller.
+
+Nenhuma migration de produtos existe no estado atual.
+
+## Segurança
+
+- Segredos ficam somente no `.env`.
+- Valores dinâmicos nas views são escapados com `e()`.
+- O núcleo mantém CSRF, sessão segura, validação, logs e tratamento de erros para usos futuros.
+- Uploads bloqueiam execução PHP e não são versionados.
+- O cardápio não contém número de WhatsApp fictício nem envia dados externamente.
+
+Consulte a política em [docs/SECURITY.md](docs/SECURITY.md) e a visão estrutural em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Deploy HostGator
 
 ```bash
 composer deploy:hostgator
 ```
 
-O mirror gerado fica em `deploy/hostgator/mirror/`, fora do Git. Consulte [deploy para HostGator/cPanel](deploy/hostgator/README.md).
+O comando executa os checks e gera `deploy/hostgator/mirror/`, uma cópia local preparada para atualização manual na hospedagem. O mirror e suas informações locais de build permanecem fora do Git.
 
-## Estrutura
+O processo não envia arquivos ao servidor e não inclui `.env`, configurações PHP/Apache existentes, uploads, logs ou cache. Nunca sobrescreva o `.env` de produção. As regras do servidor devem ser mescladas manualmente na primeira instalação.
 
-```text
-app/                 Núcleo, controllers e código do domínio
-bootstrap/app.php    Composição e inicialização da aplicação
-config/              Configuração derivada do ambiente
-database/            Migrations SQL e seeds opcionais
-docs/                Arquitetura, segurança e ambiente local
-public/              Único Document Root público
-resources/views/     Layouts, componentes e páginas PHP
-routes/web.php       Rotas HTTP explícitas
-storage/             Cache e logs locais
-tests/               Testes unitários sem banco externo
-bin/                 Comandos pequenos do projeto
-deploy/hostgator/     Manifesto e documentação do mirror de produção
-```
-
-## Rotas
-
-As rotas ficam em `routes/web.php`:
-
-```php
-$router->get('/users/{id}', [$userController, 'show']);
-$router->post('/users', [$userController, 'store']);
-```
-
-GET e POST são demonstrados. PUT, PATCH e DELETE estão preparados por `_method` em um POST. A rota inexistente responde com página e status 404.
-
-## Controllers e views
-
-Controllers recebem a requisição, validam entradas, chamam serviços ou repositories quando necessários e escolhem uma `Response`. HTML extenso fica em `resources/views`; valores dinâmicos são impressos com `e()`.
-
-```php
-<h1><?= e($title) ?></h1>
-```
-
-O fluxo inicial demonstra `Router → HomeController → View → Layout`. O POST em `/example` demonstra Request, Validator, CSRF, flash e redirect HTTP sem salvar dados.
-
-## Repositories e services
-
-Crie um repository por assunto do domínio e mantenha SQL nele, por exemplo `UserRepository::findById()`. Não crie acesso genérico a tabelas arbitrárias. Services são opcionais e só devem existir quando coordenarem regra de negócio ou integração real. Models podem ser objetos simples; este projeto não inclui ORM.
-
-## Banco e migrations
-
-`App\Core\Database` cria PDO sob demanda com exceptions, fetch associativo, prepared statements nativos e `utf8mb4`. As credenciais vêm exclusivamente do ambiente.
-
-Adicione SQL versionado a `database/migrations/` com nomes ordenáveis. `composer migrate` cria a tabela de controle e executa cada arquivo ainda não registrado uma única vez. Não há migration de negócio no template. Faça backup e teste alterações de schema antes de produção.
-
-## Segurança
-
-- secrets somente no `.env`, nunca no Git;
-- prepared statements e proibição de concatenar input em SQL;
-- escape HTML com `e()`;
-- CSRF baseado em token de sessão e `hash_equals()`;
-- cookies HttpOnly, SameSite=Lax, modo estrito e Secure configurável;
-- mensagens genéricas em produção e detalhes nos logs;
-- uploads ignorados e execução de PHP bloqueada em `public/uploads`;
-- redirects HTTP, validação no backend e ações mutáveis fora de GET.
-
-Leia a política completa em [docs/SECURITY.md](docs/SECURITY.md).
+As instruções completas e os cuidados para cPanel estão em [deploy/hostgator/README.md](deploy/hostgator/README.md).
 
 ## Produção
 
@@ -160,21 +111,4 @@ APP_DEBUG=false
 SESSION_SECURE=true
 ```
 
-Instale dependências com `composer install --no-dev --classmap-authoritative`, conceda escrita apenas a `storage/` e diretórios de upload necessários, configure HTTPS e aponte o Document Root para `public/`.
-
-## Apache, cPanel e hospedagem compartilhada
-
-No cenário ideal, configure o domínio/subdomínio para a pasta `public/`. Mantenha `app`, `bootstrap`, `config`, `database`, `storage`, `tests` e `vendor` fora do diretório servido.
-
-Quando o provedor não permitir alterar o Document Root, mantenha o projeto fora de `public_html`, copie apenas o conteúdo de `public/` para `public_html` e ajuste os caminhos do front controller para a localização privada real. Não copie `.env`, `vendor` ou código interno para uma área publicamente acessível. Confirme com o provedor o caminho absoluto, suporte a PHP 8.2+, Composer, `mod_rewrite` e regras `.htaccess`; não adicione handlers PHP específicos do cPanel ao template.
-
-O comando `composer deploy:hostgator` gera um mirror de atualização com `vendor` de produção. Ele nunca inclui `.env`, `.htaccess`, configurações PHP do servidor, uploads, logs ou cache, e nunca envia ou apaga arquivos remotos. As regras Apache de exemplo devem ser mescladas manualmente na primeira instalação. Migrations também permanecem uma etapa separada.
-
-## Rotas incluídas
-
-- `GET /` — página inicial e formulário demonstrativo
-- `POST /example` — pipeline protegido, sem persistência
-- `GET /health` — `{"status":"ok"}` sem detalhes internos
-- demais caminhos — página 404 com status correto
-
-Veja também [arquitetura](docs/ARCHITECTURE.md), [segurança](docs/SECURITY.md) e [desenvolvimento local](docs/LOCAL_DEVELOPMENT.md).
+Instale as dependências com `composer install --no-dev --classmap-authoritative`, mantenha escrita apenas onde necessário e aponte o Document Root para `public/`. Quando isso não for possível, siga rigorosamente a estratégia de mirror documentada para a HostGator.

@@ -18,7 +18,7 @@ $router->get('/', [$home, 'index']);
 $router->get('/health', [$health, 'index']);
 $router->fallback(static function (Request $request) use ($app): Response {
     return Response::html($app['view']->render('pages/404', [
-        'title' => 'Page not found',
+        'title' => 'Página não encontrada | Bar e Lanchonete São Jorge',
         'path' => $request->path(),
     ]), 404);
 });

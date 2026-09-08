@@ -2,6 +2,21 @@
 
 Todas as mudanças relevantes deste projeto serão documentadas aqui.
 
+## [0.4.0] - 2026-09-08
+
+### Added
+
+- vitrine pública da Bar e Lanchonete São Jorge
+- busca e navegação por categorias
+- produtos mockados com suporte a variantes
+- carrinho em memória no navegador
+
+### Changed
+
+- identidade própria do projeto em metadados, ambiente e documentação
+- página 404 adequada ao português e à identidade da vitrine
+- inicialização JavaScript condicionada à presença do cardápio
+
 ## [0.3.0] - 2026-09-08
 
 ### Added
