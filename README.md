@@ -7,7 +7,7 @@ O atendimento é destinado a consumo no local ou retirada no estabelecimento. N�
 ## Stack
 
 - PHP 8.2 ou superior e Composer 2
-- MySQL/MariaDB como futura fonte de dados real
+- MySQL 8 como fonte oficial do catálogo comercial
 - HTML5, CSS3 e JavaScript puro
 - Apache com `mod_rewrite` e `.htaccess`
 - Hospedagem compartilhada HostGator/cPanel
@@ -43,9 +43,11 @@ composer check
 - A vitrine pública responsiva está implementada.
 - Home promocional, cardápio compacto, detalhe do produto e pedido têm telas próprias.
 - Busca, filtros por categoria, variantes, quantidades e observações funcionam no navegador.
-- Produtos e status de funcionamento são mockados em `config/menu.php`.
+- IDs, nomes, preços em centavos, categorias, subcategorias, status e tipo vêm do MySQL compartilhado logicamente com o sistema operacional da lanchonete.
+- A conexão da vitrine é usada somente para leitura; não há migrations nem escritas no catálogo da lanchonete.
+- Imagens, descrições, destaque, populares e relacionados são metadados editoriais de `config/storefront.php`.
+- Apenas o padrão confirmado `<nome base> - Meia` é agrupado em variantes, sempre dentro da mesma subcategoria.
 - O pedido é salvo localmente no navegador com `localStorage`.
-- O banco de dados ainda não está conectado ao cardápio.
 - O botão de finalização é demonstrativo e o WhatsApp ainda não está integrado.
 - Não há envio de pedido nem delivery.
 
@@ -57,6 +59,14 @@ composer check
 - `GET /pedido` — revisão do pedido persistido no navegador.
 - `GET /health` — verificação de saúde sem detalhes internos.
 - Demais caminhos — página pública 404 com o status HTTP correto.
+
+## Catálogo MySQL
+
+A vitrine lê o mesmo schema comercial usado pelo sistema operacional, por meio de `StorefrontProductRepository` e `App\Core\Database`. Configure host, porta, banco, usuário, senha e charset exclusivamente no `.env` local; credenciais nunca devem ser versionadas.
+
+A camada `StorefrontCatalogService` transforma os registros ativos no modelo público, preserva IDs MySQL nas variantes e resolve slugs. O carrinho usa a chave versionada `saoJorgeCartV2` e mantém `productId`, mas seus preços continuam sendo apenas dados de interface e deverão ser revalidados pelo servidor numa futura integração.
+
+O levantamento desta execução está em [docs/CATALOG_INTEGRATION.md](docs/CATALOG_INTEGRATION.md).
 
 As rotas ficam em `routes/web.php` e seguem o fluxo `Router → Controller → View → Layout`.
 
@@ -79,9 +89,7 @@ deploy/hostgator/     Configuração do mirror de produção
 
 ## Banco de dados
 
-`App\Core\Database` disponibiliza PDO com prepared statements nativos e `utf8mb4`. As credenciais vêm exclusivamente do ambiente. A futura integração do cardápio deverá substituir os dados de `config/menu.php` sem inserir SQL nas views ou no controller.
-
-Nenhuma migration de produtos existe no estado atual.
+`App\Core\Database` disponibiliza PDO com prepared statements nativos e `utf8mb4`. As credenciais vêm exclusivamente do ambiente. A vitrine não possui migration para o catálogo compartilhado e não deve executar comandos de escrita nesse banco.
 
 ## Segurança
 
