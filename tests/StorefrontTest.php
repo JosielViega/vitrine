@@ -8,16 +8,17 @@ use App\Core\Request;
 use App\Core\Router;
 use App\Core\View;
 use App\Repositories\StorefrontCatalogRepository;
+use App\Services\BusinessHoursService;
 use App\Services\StorefrontCatalogService;
+use DateTimeImmutable;
+use DateTimeZone;
 use PHPUnit\Framework\TestCase;
 
 final class StorefrontTest extends TestCase
 {
     public function testPublicRoutesUseFixtureCatalogWithoutDatabase(): void
     {
-        $root = dirname(__DIR__);
-        $app = ['view' => new View($root . '/resources/views'), 'catalog' => $this->catalog(), 'router' => new Router()];
-        $router = require $root . '/routes/web.php';
+        $router = $this->routerAt('2026-09-10 18:00:00');
 
         $home = $this->dispatch($router, 'GET', '/');
         $menu = $this->dispatch($router, 'GET', '/cardapio');
@@ -29,6 +30,8 @@ final class StorefrontTest extends TestCase
         self::assertSame(200, $home->status());
         self::assertStringContainsString('Destaque da casa', $home->body());
         self::assertStringContainsString('/assets/images/brand/logo-sao-jorge.png', $home->body());
+        self::assertStringContainsString('Aberto agora', $home->body());
+        self::assertStringContainsString('Hoje até 21h30', $home->body());
         self::assertSame(200, $menu->status());
         self::assertStringContainsString('Buscar no cardápio', $menu->body());
         self::assertSame(200, $product->status());
@@ -36,13 +39,36 @@ final class StorefrontTest extends TestCase
         self::assertStringContainsString('R$ 62,00', $product->body());
         self::assertStringContainsString('value="10"', $product->body());
         self::assertStringContainsString('value="11"', $product->body());
+        self::assertStringContainsString('Adicionar ao pedido', $product->body());
         self::assertSame(200, $order->status());
-        self::assertStringContainsString('Finalizar pedido no WhatsApp', $order->body());
+        self::assertStringContainsString('data-business-open="true"', $order->body());
+        self::assertStringContainsString('Pedidos até 21h30', $order->body());
+        self::assertStringNotContainsString('data-checkout disabled', $order->body());
         self::assertSame('{"status":"ok"}', $health->body());
         self::assertSame(404, $unknown->status());
     }
 
-    public function testVersionedCartContractUsesRealProductIdAndIntegerCents(): void
+    public function testClosedHoursOnlyDisableCheckout(): void
+    {
+        $router = $this->routerAt('2026-09-10 21:30:00');
+
+        $home = $this->dispatch($router, 'GET', '/');
+        $menu = $this->dispatch($router, 'GET', '/cardapio');
+        $product = $this->dispatch($router, 'GET', '/produto/camarao');
+        $order = $this->dispatch($router, 'GET', '/pedido');
+
+        self::assertStringContainsString('Fechado agora', $home->body());
+        self::assertStringContainsString('Abrimos sexta-feira às 17h', $home->body());
+        self::assertSame(200, $menu->status());
+        self::assertSame(200, $product->status());
+        self::assertStringContainsString('Adicionar ao pedido', $product->body());
+        self::assertStringContainsString('data-business-open="false"', $order->body());
+        self::assertStringContainsString('data-checkout disabled', $order->body());
+        self::assertStringContainsString('Pedidos pelo WhatsApp estão disponíveis durante nosso horário de atendimento.', $order->body());
+        self::assertStringContainsString('Abrimos sexta-feira às 17h', $order->body());
+    }
+
+    public function testVersionedCartContractUsesServerBusinessStatus(): void
     {
         $javascript = file_get_contents(dirname(__DIR__) . '/public/assets/js/app.js');
 
@@ -51,6 +77,9 @@ final class StorefrontTest extends TestCase
         self::assertStringContainsString('productId', $javascript);
         self::assertStringContainsString('publicProductId', $javascript);
         self::assertStringContainsString('priceCents', $javascript);
+        self::assertStringContainsString("screen.dataset.businessOpen === 'true'", $javascript);
+        self::assertStringNotContainsString('new Date(', $javascript);
+        self::assertStringNotContainsString('.getDay(', $javascript);
         self::assertStringNotContainsString("const CART_KEY = 'saoJorgeCart'", $javascript);
     }
 
@@ -59,6 +88,16 @@ final class StorefrontTest extends TestCase
         $html = (new View(dirname(__DIR__) . '/resources/views'))->render('pages/404', ['title' => 'Página não encontrada', 'path' => '/<script>alert(1)</script>']);
         self::assertStringContainsString('&lt;script&gt;', $html);
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
+    }
+
+    private function routerAt(string $dateTime): Router
+    {
+        $root = dirname(__DIR__);
+        $now = new DateTimeImmutable($dateTime, new DateTimeZone('America/Sao_Paulo'));
+        $businessHours = new BusinessHoursService(require $root . '/config/business.php', static fn (): DateTimeImmutable => $now);
+        $app = ['view' => new View($root . '/resources/views'), 'catalog' => $this->catalog(), 'businessHours' => $businessHours, 'router' => new Router()];
+
+        return require $root . '/routes/web.php';
     }
 
     private function catalog(): StorefrontCatalogService
@@ -76,6 +115,7 @@ final class StorefrontTest extends TestCase
             public function activeSubcategories(): array { return $this->subcategories; }
             public function activeProducts(): array { return $this->products; }
         };
+
         return new StorefrontCatalogService($repository, ['featured' => 'camarao', 'popular' => ['batata'], 'fallback_image' => '/assets/images/products/mixed-portion-placeholder.jpg']);
     }
 

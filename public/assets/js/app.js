@@ -101,6 +101,7 @@ function initOrder() {
     const screen = document.querySelector('[data-page="order"]');
     if (!screen) return;
     const list = screen.querySelector('[data-order-items]'); const empty = screen.querySelector('[data-empty-order]'); const subtotal = screen.querySelector('[data-order-subtotal]'); const total = screen.querySelector('[data-order-total]'); const checkout = screen.querySelector('[data-checkout]'); const notice = screen.querySelector('[data-checkout-notice]'); let cart = loadCart();
+    const businessOpen = screen.dataset.businessOpen === 'true';
     function render() {
         list.replaceChildren();
         cart.forEach((item) => {
@@ -120,12 +121,12 @@ function initOrder() {
         });
         const valueCents = cart.reduce((sum, item) => sum + (item.priceCents * item.quantity), 0);
         subtotal.textContent = currency.format(valueCents / 100); total.textContent = currency.format(valueCents / 100);
-        empty.hidden = cart.length > 0; checkout.disabled = cart.length === 0; notice.hidden = true;
+        empty.hidden = cart.length > 0; checkout.disabled = cart.length === 0 || !businessOpen; notice.hidden = true;
     }
     function persistAndRender() { saveCart(cart); render(); }
     function change(key, difference) { const item = cart.find((candidate) => candidate.key === key); if (!item) return; item.quantity += difference; if (item.quantity <= 0) cart = cart.filter((candidate) => candidate.key !== key); persistAndRender(); }
     screen.querySelector('[data-clear-cart]').addEventListener('click', () => { cart = []; persistAndRender(); showToast('Pedido limpo'); });
-    checkout.addEventListener('click', () => { notice.hidden = false; }); render();
+    checkout.addEventListener('click', () => { if (businessOpen) notice.hidden = false; }); render();
 }
 
 updateCartIndicators(); initMenu(); initProduct(); initOrder();

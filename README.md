@@ -51,6 +51,16 @@ composer check
 - O botão de finalização é demonstrativo e o WhatsApp ainda não está integrado.
 - Não há envio de pedido nem delivery.
 
+## Horário de funcionamento
+
+A lanchonete funciona de quinta-feira a sábado, das 17h às 21h30, no timezone `America/Sao_Paulo`. O intervalo considera 17:00 como aberto e 21:30 como fechado.
+
+O status “Aberto agora” ou “Fechado agora” e a próxima abertura são calculados pelo backend PHP a partir de `config/business.php`. Mesmo fora do horário, o cliente pode navegar, buscar produtos, escolher variantes, adicionar itens, alterar quantidades e observações e revisar o carrinho. Apenas a finalização demonstrativa fica indisponível enquanto o estabelecimento estiver fechado.
+
+O estado enviado ao JavaScript serve para a experiência da interface. Quando a integração real com WhatsApp for implementada, o horário deverá ser verificado novamente no backend ou em outro fluxo confiável; `disabled`, JavaScript e `localStorage` não são controles de segurança suficientes.
+
+Domingo, segunda, terça e quarta-feira são dias fechados. Não há nesta etapa calendário administrativo, feriados automáticos ou alteração no MySQL.
+
 ## Rotas
 
 - `GET /` — home promocional.

@@ -16,7 +16,7 @@ final class StorefrontCatalogService
     ) {
     }
 
-    /** @return array{isOpen: bool, categories: list<array<string, mixed>>, subcategories: list<array<string, mixed>>, products: list<array<string, mixed>>} */
+    /** @return array{categories: list<array<string, mixed>>, subcategories: list<array<string, mixed>>, products: list<array<string, mixed>>} */
     public function catalog(): array
     {
         return $this->cachedCatalog ??= $this->transform(
@@ -174,7 +174,7 @@ final class StorefrontCatalogService
         }
         unset($product);
 
-        return ['isOpen' => (bool) ($this->presentation['isOpen'] ?? true), 'categories' => $publicCategories, 'subcategories' => $publicSubcategories, 'products' => $products];
+        return ['categories' => $publicCategories, 'subcategories' => $publicSubcategories, 'products' => $products];
     }
 
     private function product(array $row, string $name, array $variants, array $categories, array $subcategories): array

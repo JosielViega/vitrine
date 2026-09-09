@@ -11,6 +11,7 @@ use App\Core\Router;
 use App\Core\Session;
 use App\Core\View;
 use App\Repositories\StorefrontProductRepository;
+use App\Services\BusinessHoursService;
 use App\Services\StorefrontCatalogService;
 use App\Validation\Validator;
 use Dotenv\Dotenv;
@@ -26,6 +27,7 @@ require $autoload;
 Dotenv::createImmutable($root)->safeLoad();
 $appConfig = require $root . '/config/app.php';
 $databaseConfig = require $root . '/config/database.php';
+$businessConfig = require $root . '/config/business.php';
 $logger = new Logger($root . '/storage/logs');
 (new ErrorHandler($logger, $appConfig['debug']))->register();
 if (!in_array($appConfig['environment'], ['local', 'testing', 'production'], true)) {
@@ -37,10 +39,12 @@ $session = new Session();
 $session->start(['name' => $appConfig['session']['name'], 'cookie_httponly' => true, 'cookie_secure' => $appConfig['session']['secure'] || $httpsActive, 'cookie_samesite' => 'Lax', 'cookie_path' => '/', 'use_strict_mode' => true, 'use_only_cookies' => true]);
 $database = new Database($databaseConfig);
 $catalog = new StorefrontCatalogService(new StorefrontProductRepository($database), require $root . '/config/storefront.php');
+$businessHours = new BusinessHoursService($businessConfig);
 
 return [
     'config' => $appConfig,
     'catalog' => $catalog,
+    'businessHours' => $businessHours,
     'request' => Request::capture(),
     'router' => new Router(),
     'view' => new View($root . '/resources/views'),

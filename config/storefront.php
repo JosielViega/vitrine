@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 return [
-    'isOpen' => true,
     'featured' => 'camarao-c-batata-e-aipim',
     'popular' => ['carne-c-aipim', 'batata'],
     'variant_aliases' => [

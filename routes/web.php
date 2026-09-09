@@ -7,7 +7,7 @@ use App\Controllers\HomeController;
 use App\Core\Request;
 use App\Core\Response;
 
-$home = new HomeController($app['view'], $app['catalog']);
+$home = new HomeController($app['view'], $app['catalog'], $app['businessHours']);
 $health = new HealthController();
 $router = $app['router'];
 $router->get('/', [$home, 'index']);

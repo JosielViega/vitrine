@@ -6,12 +6,16 @@ namespace App\Controllers;
 
 use App\Core\Response;
 use App\Core\View;
+use App\Services\BusinessHoursService;
 use App\Services\StorefrontCatalogService;
 
 final class HomeController
 {
-    public function __construct(private readonly View $view, private readonly StorefrontCatalogService $catalog)
-    {
+    public function __construct(
+        private readonly View $view,
+        private readonly StorefrontCatalogService $catalog,
+        private readonly BusinessHoursService $businessHours,
+    ) {
     }
 
     public function index(): Response
@@ -24,6 +28,7 @@ final class HomeController
             'menu' => $menu,
             'featured' => $featured,
             'popular' => $this->catalog->popular($featured['id'] ?? null),
+            'businessStatus' => $this->businessHours->currentStatus(),
         ]));
     }
 
@@ -54,6 +59,9 @@ final class HomeController
 
     public function order(): Response
     {
-        return Response::html($this->view->render('pages/order', ['title' => 'Meu Pedido | Bar e Lanchonete São Jorge']));
+        return Response::html($this->view->render('pages/order', [
+            'title' => 'Meu Pedido | Bar e Lanchonete São Jorge',
+            'businessStatus' => $this->businessHours->currentStatus(),
+        ]));
     }
 }
