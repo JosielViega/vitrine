@@ -9,6 +9,8 @@ use App\Repositories\StorefrontCatalogRepository;
 final class StorefrontCatalogService
 {
     private ?array $cachedCatalog = null;
+    /** @var null|array<int, array{product: array<string, mixed>, variant: array<string, mixed>}> */
+    private ?array $variantIndex = null;
 
     public function __construct(
         private readonly StorefrontCatalogRepository $repository,
@@ -35,6 +37,27 @@ final class StorefrontCatalogService
         }
 
         return null;
+    }
+
+    /** @return null|array{product: array<string, mixed>, variant: array<string, mixed>} */
+    public function findVariantByProductId(int $productId): ?array
+    {
+        if ($productId <= 0) {
+            return null;
+        }
+        if ($this->variantIndex === null) {
+            $this->variantIndex = [];
+            foreach ($this->catalog()['products'] as $product) {
+                foreach ($product['variants'] as $variant) {
+                    $this->variantIndex[(int) $variant['product_id']] = [
+                        'product' => $product,
+                        'variant' => $variant,
+                    ];
+                }
+            }
+        }
+
+        return $this->variantIndex[$productId] ?? null;
     }
 
     public function featured(): ?array

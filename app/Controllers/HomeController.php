@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Core\Csrf;
 use App\Core\Response;
 use App\Core\View;
 use App\Services\BusinessHoursService;
@@ -15,6 +16,7 @@ final class HomeController
         private readonly View $view,
         private readonly StorefrontCatalogService $catalog,
         private readonly BusinessHoursService $businessHours,
+        private readonly Csrf $csrf,
     ) {
     }
 
@@ -62,6 +64,7 @@ final class HomeController
         return Response::html($this->view->render('pages/order', [
             'title' => 'Meu Pedido | Bar e Lanchonete São Jorge',
             'businessStatus' => $this->businessHours->currentStatus(),
+            'csrfToken' => $this->csrf->token(),
         ]));
     }
 }

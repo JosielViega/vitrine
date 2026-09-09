@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Core\Csrf;
+use App\Core\Logger;
+use App\Core\Session;
 use App\Core\Request;
 use App\Core\Router;
 use App\Core\View;
 use App\Repositories\StorefrontCatalogRepository;
 use App\Services\BusinessHoursService;
 use App\Services\StorefrontCatalogService;
+use App\Services\WhatsAppCheckoutService;
 use DateTimeImmutable;
 use DateTimeZone;
 use PHPUnit\Framework\TestCase;
@@ -43,7 +47,9 @@ final class StorefrontTest extends TestCase
         self::assertSame(200, $order->status());
         self::assertStringContainsString('data-business-open="true"', $order->body());
         self::assertStringContainsString('Pedidos até 21h30', $order->body());
-        self::assertStringNotContainsString('data-checkout disabled', $order->body());
+        self::assertStringContainsString('data-checkout-token', $order->body());
+        self::assertStringContainsString('value="pickup"', $order->body());
+        self::assertStringContainsString('value="dine_in"', $order->body());
         self::assertSame('{"status":"ok"}', $health->body());
         self::assertSame(404, $unknown->status());
     }
@@ -95,7 +101,12 @@ final class StorefrontTest extends TestCase
         $root = dirname(__DIR__);
         $now = new DateTimeImmutable($dateTime, new DateTimeZone('America/Sao_Paulo'));
         $businessHours = new BusinessHoursService(require $root . '/config/business.php', static fn (): DateTimeImmutable => $now);
-        $app = ['view' => new View($root . '/resources/views'), 'catalog' => $this->catalog(), 'businessHours' => $businessHours, 'router' => new Router()];
+        $session = new Session(false);
+        $csrf = new Csrf($session);
+        $catalog = $this->catalog();
+        $logger = new Logger(sys_get_temp_dir() . '/vitrine-test-logs');
+        $checkout = new WhatsAppCheckoutService($businessHours, $catalog, ['number' => '5527998586163']);
+        $app = ['view' => new View($root . '/resources/views'), 'catalog' => $catalog, 'businessHours' => $businessHours, 'whatsappCheckout' => $checkout, 'request' => new Request(), 'csrf' => $csrf, 'logger' => $logger, 'router' => new Router()];
 
         return require $root . '/routes/web.php';
     }

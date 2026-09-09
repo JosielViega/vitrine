@@ -1,6 +1,6 @@
 # Bar e Lanchonete São Jorge — Vitrine
 
-Vitrine e cardápio digital público da Bar e Lanchonete São Jorge. A aplicação permite consultar porções, bebidas e sucos, escolher tamanhos e montar um pedido no navegador. A finalização via WhatsApp será integrada em uma etapa futura.
+Vitrine e cardápio digital público da Bar e Lanchonete São Jorge. A aplicação permite consultar porções, bebidas e sucos, escolher tamanhos, montar um pedido e finalizar pelo WhatsApp.
 
 O atendimento é destinado a consumo no local ou retirada no estabelecimento. Não há delivery.
 
@@ -47,19 +47,29 @@ composer check
 - A conexão da vitrine é usada somente para leitura; não há migrations nem escritas no catálogo da lanchonete.
 - Imagens, descrições, destaque, populares e relacionados são metadados editoriais de `config/storefront.php`.
 - O padrão real `Meia: <nome base>` é agrupado em variantes apenas por igualdade normalizada e dentro da mesma subcategoria; exceções explícitas ficam em `config/storefront.php` e o formato legado `<nome base> - Meia` segue compatível.
-- O pedido é salvo localmente no navegador com `localStorage`.
-- O botão de finalização é demonstrativo e o WhatsApp ainda não está integrado.
-- Não há envio de pedido nem delivery.
+- O pedido permanece salvo localmente no navegador com `localStorage`.
+- A finalização revalida horário, produtos ativos e preços no servidor antes de gerar a URL oficial do WhatsApp.
+- Nenhum pedido é persistido no sistema e não há delivery.
 
 ## Horário de funcionamento
 
 A lanchonete funciona de quinta-feira a sábado, das 17h às 21h30, no timezone `America/Sao_Paulo`. O intervalo considera 17:00 como aberto e 21:30 como fechado.
 
-O status “Aberto agora” ou “Fechado agora” e a próxima abertura são calculados pelo backend PHP a partir de `config/business.php`. Mesmo fora do horário, o cliente pode navegar, buscar produtos, escolher variantes, adicionar itens, alterar quantidades e observações e revisar o carrinho. Apenas a finalização demonstrativa fica indisponível enquanto o estabelecimento estiver fechado.
+O status “Aberto agora” ou “Fechado agora” e a próxima abertura são calculados pelo backend PHP a partir de `config/business.php`. Mesmo fora do horário, o cliente pode navegar, buscar produtos, escolher variantes, adicionar itens, alterar quantidades e observações e revisar o carrinho. Apenas a finalização pelo WhatsApp fica indisponível enquanto o estabelecimento estiver fechado.
 
-O estado enviado ao JavaScript serve para a experiência da interface. Quando a integração real com WhatsApp for implementada, o horário deverá ser verificado novamente no backend ou em outro fluxo confiável; `disabled`, JavaScript e `localStorage` não são controles de segurança suficientes.
+O estado enviado ao JavaScript serve para a experiência da interface. O endpoint de checkout verifica novamente o horário no momento do POST; `disabled`, JavaScript e `localStorage` não são tratados como controles de segurança.
 
 Domingo, segunda, terça e quarta-feira são dias fechados. Não há nesta etapa calendário administrativo, feriados automáticos ou alteração no MySQL.
+
+## Finalização pelo WhatsApp
+
+Em `/pedido`, o cliente escolhe **Retirada no local** ou **Consumir no local**. O navegador envia o carrinho por formulário ao endpoint `POST /checkout/whatsapp`, protegido por CSRF. A URL `wa.me` é criada exclusivamente pelo backend; o número é lido de `WHATSAPP_NUMBER` no `.env` e normalizado para dígitos.
+
+Antes de responder, `WhatsAppCheckoutService` recarrega cada `productId` no catálogo ativo, usa o preço atual em centavos e recalcula o total. Nomes, variantes, imagens, disponibilidade e preços enviados pelo `localStorage` não são confiáveis. Se um preço mudou, o servidor devolve o carrinho sanitizado e autoritativo para conferência antes de uma nova tentativa.
+
+A vitrine continua usando o MySQL somente para leitura. O endpoint não cria pedido, cliente, pagamento ou registro de checkout; ele apenas valida o carrinho, monta a mensagem e devolve a URL do WhatsApp. O carrinho não é apagado automaticamente após abrir o WhatsApp.
+
+O número comercial deve ser configurado manualmente em cada ambiente. O `.env.example` contém somente `WHATSAPP_NUMBER=` e nenhuma credencial ou número real.
 
 ## Rotas
 
@@ -67,6 +77,7 @@ Domingo, segunda, terça e quarta-feira são dias fechados. Não há nesta etapa
 - `GET /cardapio` — cardápio completo com busca e categorias.
 - `GET /produto/{slug}` — escolha de tamanho, quantidade e observações.
 - `GET /pedido` — revisão do pedido persistido no navegador.
+- `POST /checkout/whatsapp` — revalidação do carrinho e geração da URL do WhatsApp.
 - `GET /health` — verificação de saúde sem detalhes internos.
 - Demais caminhos — página pública 404 com o status HTTP correto.
 
@@ -74,7 +85,7 @@ Domingo, segunda, terça e quarta-feira são dias fechados. Não há nesta etapa
 
 A vitrine lê o mesmo schema comercial usado pelo sistema operacional, por meio de `StorefrontProductRepository` e `App\Core\Database`. Configure host, porta, banco, usuário, senha e charset exclusivamente no `.env` local; credenciais nunca devem ser versionadas.
 
-A camada `StorefrontCatalogService` transforma os registros ativos no modelo público, preserva IDs MySQL nas variantes e resolve slugs. O carrinho usa a chave versionada `saoJorgeCartV2` e mantém `productId`, mas seus preços continuam sendo apenas dados de interface e deverão ser revalidados pelo servidor numa futura integração.
+A camada `StorefrontCatalogService` transforma os registros ativos no modelo público, preserva IDs MySQL nas variantes e resolve slugs. O carrinho usa a chave versionada `saoJorgeCartV2`; durante o checkout, cada `productId` é resolvido novamente no catálogo e os preços da interface são comparados com os valores oficiais.
 
 O levantamento desta execução está em [docs/CATALOG_INTEGRATION.md](docs/CATALOG_INTEGRATION.md).
 
@@ -107,7 +118,7 @@ deploy/hostgator/     Configuração do mirror de produção
 - Valores dinâmicos nas views são escapados com `e()`.
 - O núcleo mantém CSRF, sessão segura, validação, logs e tratamento de erros para usos futuros.
 - Uploads bloqueiam execução PHP e não são versionados.
-- O cardápio não contém número de WhatsApp fictício nem envia dados externamente.
+- O número do WhatsApp não aparece no JavaScript ou nas views e vem exclusivamente do ambiente.
 
 Consulte a política em [docs/SECURITY.md](docs/SECURITY.md) e a visão estrutural em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

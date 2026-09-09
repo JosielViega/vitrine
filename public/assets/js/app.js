@@ -100,8 +100,10 @@ function createQuantityButton(label, symbol, action) {
 function initOrder() {
     const screen = document.querySelector('[data-page="order"]');
     if (!screen) return;
-    const list = screen.querySelector('[data-order-items]'); const empty = screen.querySelector('[data-empty-order]'); const subtotal = screen.querySelector('[data-order-subtotal]'); const total = screen.querySelector('[data-order-total]'); const checkout = screen.querySelector('[data-checkout]'); const notice = screen.querySelector('[data-checkout-notice]'); let cart = loadCart();
-    const businessOpen = screen.dataset.businessOpen === 'true';
+    const list = screen.querySelector('[data-order-items]'); const empty = screen.querySelector('[data-empty-order]'); const subtotal = screen.querySelector('[data-order-subtotal]'); const total = screen.querySelector('[data-order-total]'); const checkout = screen.querySelector('[data-checkout]'); const checkoutLabel = screen.querySelector('[data-checkout-label]'); const notice = screen.querySelector('[data-checkout-notice]'); const token = screen.querySelector('[data-checkout-token]'); const serviceTypes = [...screen.querySelectorAll('input[name="service_type"]')]; let cart = loadCart(); let businessOpen = screen.dataset.businessOpen === 'true'; let submitting = false;
+    const selectedServiceType = () => serviceTypes.find((option) => option.checked)?.value || '';
+    function updateCheckoutState() { checkout.disabled = submitting || !businessOpen || cart.length === 0 || selectedServiceType() === ''; checkoutLabel.textContent = submitting ? 'Validando pedido...' : 'Finalizar pedido no WhatsApp'; }
+    function showCheckoutNotice(message, isError = false) { notice.textContent = message; notice.classList.toggle('is-error', isError); notice.hidden = false; }
     function render() {
         list.replaceChildren();
         cart.forEach((item) => {
@@ -121,12 +123,34 @@ function initOrder() {
         });
         const valueCents = cart.reduce((sum, item) => sum + (item.priceCents * item.quantity), 0);
         subtotal.textContent = currency.format(valueCents / 100); total.textContent = currency.format(valueCents / 100);
-        empty.hidden = cart.length > 0; checkout.disabled = cart.length === 0 || !businessOpen; notice.hidden = true;
+        empty.hidden = cart.length > 0; updateCheckoutState();
     }
     function persistAndRender() { saveCart(cart); render(); }
-    function change(key, difference) { const item = cart.find((candidate) => candidate.key === key); if (!item) return; item.quantity += difference; if (item.quantity <= 0) cart = cart.filter((candidate) => candidate.key !== key); persistAndRender(); }
+    function change(key, difference) { const item = cart.find((candidate) => candidate.key === key); if (!item) return; item.quantity += difference; if (item.quantity <= 0) cart = cart.filter((candidate) => candidate.key !== item.key); persistAndRender(); }
     screen.querySelector('[data-clear-cart]').addEventListener('click', () => { cart = []; persistAndRender(); showToast('Pedido limpo'); });
-    checkout.addEventListener('click', () => { if (businessOpen) notice.hidden = false; }); render();
+    serviceTypes.forEach((option) => option.addEventListener('change', updateCheckoutState));
+    checkout.addEventListener('click', async () => {
+        if (checkout.disabled) return;
+        submitting = true; updateCheckoutState(); notice.hidden = true;
+        try {
+            const body = new URLSearchParams({ _token: token.value, cart: JSON.stringify(cart), service_type: selectedServiceType() });
+            const response = await fetch('/checkout/whatsapp', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'Accept': 'application/json' }, body });
+            const result = await response.json();
+            if (response.ok && result.ok && typeof result.whatsapp_url === 'string' && result.whatsapp_url.startsWith('https://wa.me/')) {
+                window.location.assign(result.whatsapp_url); return;
+            }
+            if (result.code === 'cart_changed' && Array.isArray(result.cart)) {
+                saveCart(result.cart); cart = loadCart(); render();
+            }
+            if (result.code === 'business_closed') { businessOpen = false; screen.dataset.businessOpen = 'false'; }
+            showCheckoutNotice(result.message || 'Não foi possível finalizar agora. Tente novamente.', true);
+        } catch {
+            showCheckoutNotice('Não foi possível conectar para finalizar. Tente novamente.', true);
+        } finally {
+            submitting = false; updateCheckoutState();
+        }
+    });
+    render();
 }
 
 updateCartIndicators(); initMenu(); initProduct(); initOrder();
