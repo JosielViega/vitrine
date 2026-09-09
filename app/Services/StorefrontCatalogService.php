@@ -134,7 +134,7 @@ final class StorefrontCatalogService
             foreach ($subcategoryRows as $row) {
                 $baseName = $this->halfBaseName((string) $row['name']);
                 if ($baseName !== null) {
-                    $halves[$this->slug($baseName)][] = $row;
+                    $halves[$this->halfMatchSlug($baseName)][] = $row;
                 }
             }
             $consumed = [];
@@ -192,7 +192,21 @@ final class StorefrontCatalogService
 
     private function halfBaseName(string $name): ?string
     {
-        return preg_match('/^(?<base>.+?)\s+-\s*meia\s*$/iu', $name, $matches) === 1 ? trim($matches['base']) : null;
+        foreach (['/^\s*meia\s*:\s*(?<base>.+?)\s*$/iu', '/^(?<base>.+?)\s+-\s*meia\s*$/iu'] as $pattern) {
+            if (preg_match($pattern, $name, $matches) === 1 && trim($matches['base']) !== '') {
+                return trim($matches['base']);
+            }
+        }
+
+        return null;
+    }
+
+    private function halfMatchSlug(string $baseName): string
+    {
+        $slug = $this->slug($baseName);
+        $aliases = (array) ($this->presentation['variant_aliases'] ?? []);
+
+        return $this->slug((string) ($aliases[$slug] ?? $slug));
     }
 
     private function slug(string $value): string

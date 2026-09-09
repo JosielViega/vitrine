@@ -48,11 +48,15 @@ Foram encontrados 20 produtos ativos, todos `kitchen`, todos na subcategoria **P
 19. Meia: Pescadinha
 20. Meia: Porção Carne
 
-Não foi encontrado produto no padrão autorizado pelo briefing, `<nome base> - Meia`. Por isso, nesta execução nenhum registro real foi agrupado automaticamente como variante. Os registros `Meia: ...` permanecem produtos públicos independentes, preservando ID e preço reais. O service possui cobertura automatizada para a regra de sufixo autorizada e para o caso de meia sem base.
+A regra pública reconhece `Meia: <nome base>` sem diferenciar maiúsculas de minúsculas e com espaços flexíveis ao redor e depois de `:`. O pareamento exige igualdade do nome normalizado e a mesma subcategoria; não há aproximação por similaridade. No catálogo real, 19 pares são diretos e a exceção explícita `Porção Carne` → `Porção de carne`, declarada em `config/storefront.php`, completa 20 agrupamentos. Assim, os 20 cards separados de meia porção deixam de existir e o catálogo público passa de 135 registros ativos para 115 produtos públicos.
+
+Cada produto agrupado mantém as variantes na ordem **Inteira** e **Meia**, com `product_id`, preço inteiro em centavos e `kind` vindos do MySQL. Exemplos conferidos: Camarão c/ Batata e Aipim (79/8500 e 82/7200), Batata (59/3000 e 116/2000), Pescadinha (112/4200 e 113/3200) e Porção de carne (127/4200 e 130/3200).
+
+Uma meia porção sem produto-base continua publicada isoladamente com a variante `Meia`; um produto inteiro sem meia continua isolado; nomes iguais em subcategorias diferentes não são agrupados. O formato legado `<nome base> - Meia` permanece compatível.
 
 ## Inconsistências relevantes
 
-- O padrão real `Meia: <nome>` diverge do padrão comercial confirmado no briefing (`<nome> - Meia`). Alterar essa interpretação exige uma regra de negócio explícita.
+- `Meia: Porção Carne` difere do inteiro `Porção de carne`; essa única equivalência é intencional, auditável e configurada sem IDs fixos.
 - Todas as categorias e subcategorias possuem `sort_order = 0`; a ordem secundária acaba sendo alfabética.
 - Há um registro inativo `Água Mineral` e um registro ativo `Agua Mineral`, com diferença apenas de acentuação.
 - Foi encontrado o nome `Peps 2 Litros`, possivelmente uma grafia incompleta de marca; ele é publicado sem correção porque o banco é a fonte oficial do nome.

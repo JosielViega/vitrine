@@ -67,7 +67,7 @@ final class StorefrontTest extends TestCase
         $subcategories = [['id' => 1, 'category_id' => 1, 'name' => 'Porções', 'sort_order' => 0, 'active' => 1]];
         $products = [
             ['id' => 10, 'subcategory_id' => 1, 'category_id' => 1, 'name' => 'Camarão', 'price_cents' => 7500, 'kind' => 'kitchen', 'active' => 1],
-            ['id' => 11, 'subcategory_id' => 1, 'category_id' => 1, 'name' => 'Camarão - Meia', 'price_cents' => 6200, 'kind' => 'kitchen', 'active' => 1],
+            ['id' => 11, 'subcategory_id' => 1, 'category_id' => 1, 'name' => 'Meia: Camarão', 'price_cents' => 6200, 'kind' => 'kitchen', 'active' => 1],
             ['id' => 12, 'subcategory_id' => 1, 'category_id' => 1, 'name' => 'Batata', 'price_cents' => 3000, 'kind' => 'kitchen', 'active' => 1],
         ];
         $repository = new class($categories, $subcategories, $products) implements StorefrontCatalogRepository {

@@ -46,7 +46,7 @@ composer check
 - IDs, nomes, preços em centavos, categorias, subcategorias, status e tipo vêm do MySQL compartilhado logicamente com o sistema operacional da lanchonete.
 - A conexão da vitrine é usada somente para leitura; não há migrations nem escritas no catálogo da lanchonete.
 - Imagens, descrições, destaque, populares e relacionados são metadados editoriais de `config/storefront.php`.
-- Apenas o padrão confirmado `<nome base> - Meia` é agrupado em variantes, sempre dentro da mesma subcategoria.
+- O padrão real `Meia: <nome base>` é agrupado em variantes apenas por igualdade normalizada e dentro da mesma subcategoria; exceções explícitas ficam em `config/storefront.php` e o formato legado `<nome base> - Meia` segue compatível.
 - O pedido é salvo localmente no navegador com `localStorage`.
 - O botão de finalização é demonstrativo e o WhatsApp ainda não está integrado.
 - Não há envio de pedido nem delivery.

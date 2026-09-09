@@ -6,6 +6,9 @@ return [
     'isOpen' => true,
     'featured' => 'camarao-c-batata-e-aipim',
     'popular' => ['carne-c-aipim', 'batata'],
+    'variant_aliases' => [
+        'porcao-carne' => 'porcao-de-carne',
+    ],
     'fallback_image' => '/assets/images/products/mixed-portion-placeholder.jpg',
     'fallback_images' => [
         'bebidas' => '/assets/images/storefront/drinks-placeholder.jpg',
