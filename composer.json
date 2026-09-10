@@ -34,6 +34,7 @@
         "port:status": "@php bin/port-status.php",
         "port:release": "@php bin/port-release.php",
         "migrate": "@php bin/migrate.php",
+        "storefront:visibility-schema": "@php bin/apply-storefront-visibility.php",
         "lint": "@php bin/lint.php",
         "test": "@php vendor/bin/phpunit",
         "check": [
