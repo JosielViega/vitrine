@@ -34,6 +34,11 @@ final class Response
         return new self('', $status, ['Location' => $location]);
     }
 
+    public function withHeader(string $name, string $value): self
+    {
+        return new self($this->body, $this->status, [...$this->headers, $name => $value]);
+    }
+
     public function send(): never
     {
         http_response_code($this->status);

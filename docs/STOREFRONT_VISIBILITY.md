@@ -59,3 +59,7 @@ ALTER TABLE categories DROP COLUMN storefront_visible;
 ```
 
 Não execute esse rollback enquanto esta versão da vitrine estiver ativa. Faça backup e valide consumidores do banco compartilhado antes de remover as colunas.
+
+## Painel administrativo
+
+O painel `/admin` permite alternar somente `storefront_visible` nas três camadas. Ele lista também itens ocultos e inativos, mantém os estados dos filhos ao ocultar um pai e apresenta a diferença entre visibilidade direta e efetiva. A autenticação consulta `admin_users`, mas usa a sessão própria da vitrine, sem “Lembrar-me” ou compartilhamento de cookie. Consulte `docs/ADMIN.md` para as rotas e garantias de segurança.

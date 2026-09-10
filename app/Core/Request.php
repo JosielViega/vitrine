@@ -29,6 +29,11 @@ final class Request
         return $this->queryParams[$key] ?? $default;
     }
 
+    public function acceptsJson(): bool
+    {
+        return str_contains(strtolower((string) ($this->server['HTTP_ACCEPT'] ?? '')), 'application/json');
+    }
+
     public function file(string $key): ?array
     {
         $file = $this->files[$key] ?? null;

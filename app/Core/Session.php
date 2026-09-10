@@ -6,8 +6,10 @@ namespace App\Core;
 
 final class Session
 {
-    public function __construct(private readonly bool $autoStart = true)
-    {
+    public function __construct(
+        private readonly bool $autoStart = true,
+        private readonly ?\Closure $regenerator = null,
+    ) {
     }
 
     public function start(array $options = []): void
@@ -38,6 +40,15 @@ final class Session
     public function forget(string $key): void
     {
         unset($_SESSION[$key]);
+    }
+
+    public function regenerate(): bool
+    {
+        if ($this->regenerator instanceof \Closure) {
+            return (bool) ($this->regenerator)();
+        }
+
+        return session_status() === PHP_SESSION_ACTIVE && session_regenerate_id(true);
     }
 
     public function flash(string $type, string $message): void
