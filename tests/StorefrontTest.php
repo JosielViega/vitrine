@@ -91,6 +91,16 @@ final class StorefrontTest extends TestCase
         self::assertStringNotContainsString("const CART_KEY = 'saoJorgeCart'", $javascript);
     }
 
+    public function testMenuUsesControlledCategoryNavigation(): void
+    {
+        $javascript = file_get_contents(dirname(__DIR__) . '/public/assets/js/app.js');
+
+        self::assertIsString($javascript);
+        self::assertStringContainsString('setActiveCategory', $javascript);
+        self::assertStringContainsString("history.replaceState(null, '', `#\${categoryId}`)", $javascript);
+        self::assertStringNotContainsString('IntersectionObserver', $javascript);
+    }
+
     public function testNotFoundEscapesRequestedPath(): void
     {
         $html = (new View(dirname(__DIR__) . '/resources/views'))->render('pages/404', ['title' => 'Página não encontrada', 'path' => '/<script>alert(1)</script>']);

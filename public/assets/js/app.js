@@ -53,24 +53,52 @@ function initMenu() {
     const links = [...menu.querySelectorAll('[data-category-link]')];
     const search = menu.querySelector('#menu-search');
     const empty = menu.querySelector('#search-empty');
-    const setActive = (id) => links.forEach((link) => {
-        const active = link.dataset.categoryLink === id;
-        link.classList.toggle('is-active', active);
-        if (active) link.setAttribute('aria-current', 'true'); else link.removeAttribute('aria-current');
-    });
-    search.addEventListener('input', () => {
-        const query = normalizeText(search.value); let visibleCount = 0;
-        cards.forEach((card) => { const visible = normalizeText(card.dataset.searchName).includes(query); card.hidden = !visible; if (visible) visibleCount += 1; });
-        subcategories.forEach((subcategory) => { subcategory.hidden = !subcategory.querySelector('[data-product-row]:not([hidden])'); });
-        sections.forEach((section) => { section.hidden = !section.querySelector('[data-subcategory]:not([hidden])'); });
+    const menuList = menu.querySelector('.menu-list');
+    const tools = menu.querySelector('.menu-tools');
+    const availableCategories = new Set(sections.map((section) => section.dataset.category));
+    let activeCategory = '';
+
+    function applySearch() {
+        const query = normalizeText(search.value);
+        let visibleCount = 0;
+        cards.forEach((card) => {
+            const inActiveCategory = card.closest('[data-category]')?.dataset.category === activeCategory;
+            const matches = normalizeText(card.dataset.searchName).includes(query);
+            card.hidden = !inActiveCategory || !matches;
+            if (!card.hidden) visibleCount += 1;
+        });
+        subcategories.forEach((subcategory) => {
+            const inActiveCategory = subcategory.closest('[data-category]')?.dataset.category === activeCategory;
+            subcategory.hidden = !inActiveCategory || !subcategory.querySelector('[data-product-row]:not([hidden])');
+        });
         empty.hidden = visibleCount > 0;
-    });
-    links.forEach((link) => link.addEventListener('click', () => setActive(link.dataset.categoryLink)));
-    if ('IntersectionObserver' in window) {
-        const observer = new IntersectionObserver((entries) => { const visible = entries.find((entry) => entry.isIntersecting); if (visible) setActive(visible.target.id); }, { rootMargin: '-25% 0px -65% 0px' });
-        sections.forEach((section) => observer.observe(section));
     }
-    setActive(window.location.hash.slice(1) || sections[0]?.id);
+
+    function setActiveCategory(requestedCategory, updateHash = false, reposition = false) {
+        const categoryId = availableCategories.has(requestedCategory) ? requestedCategory : sections[0]?.dataset.category;
+        if (!categoryId) return;
+        activeCategory = categoryId;
+        sections.forEach((section) => section.classList.toggle('is-active', section.dataset.category === categoryId));
+        links.forEach((link) => {
+            const active = link.dataset.categoryLink === categoryId;
+            link.classList.toggle('is-active', active);
+            if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
+        });
+        applySearch();
+        if (updateHash && window.location.hash !== `#${categoryId}`) history.replaceState(null, '', `#${categoryId}`);
+        if (reposition) {
+            const listTop = menuList.getBoundingClientRect().top + window.scrollY - tools.offsetHeight - 8;
+            if (window.scrollY > listTop) window.scrollTo({ top: Math.max(0, listTop), behavior: 'smooth' });
+        }
+    }
+
+    search.addEventListener('input', applySearch);
+    links.forEach((link) => link.addEventListener('click', (event) => {
+        event.preventDefault();
+        setActiveCategory(link.dataset.categoryLink, true, true);
+    }));
+    window.addEventListener('hashchange', () => setActiveCategory(window.location.hash.slice(1)));
+    setActiveCategory(window.location.hash.slice(1));
 }
 
 function initProduct() {

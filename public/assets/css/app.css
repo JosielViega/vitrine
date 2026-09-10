@@ -83,7 +83,7 @@ svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; s
 .service-info.is-closed p:first-child strong::before { background: var(--red); box-shadow: 0 0 0 .2rem rgb(223 24 48 / 12%); }
 .home-slogan { margin: 1.45rem 0 0 clamp(.5rem, 5vw, 1.35rem); color: var(--text); font-family: "Segoe Script", "Bradley Hand", cursive; font-size: clamp(1.35rem, 6vw, 1.72rem); font-weight: 600; line-height: 1.22; text-shadow: 0 .15rem .55rem #000; transform: rotate(-3deg); }
 .home-slogan span { color: var(--gold-bright); }
-.home-categories { position: relative; z-index: 3; display: flex; gap: .3rem; margin: -4.25rem .75rem 0; padding: .36rem; overflow-x: auto; border: 1px solid var(--border); border-radius: .8rem; background: rgb(15 11 8 / 94%); box-shadow: 0 .55rem 1.5rem rgb(0 0 0 / 26%); scrollbar-width: none; }
+.home-categories { position: relative; z-index: 3; display: flex; gap: .3rem; margin: -.85rem .75rem 0; padding: .36rem; overflow-x: auto; border: 1px solid var(--border); border-radius: .8rem; background: rgb(15 11 8 / 94%); box-shadow: 0 .55rem 1.5rem rgb(0 0 0 / 26%); scrollbar-width: none; }
 .home-categories::-webkit-scrollbar { display: none; }
 .home-categories a { display: grid; flex: 1 0 5.8rem; place-items: center; align-content: center; gap: .38rem; min-height: 4rem; padding: .35rem .45rem; color: var(--muted); border: 1px solid transparent; border-radius: .58rem; font-size: .72rem; font-weight: 700; text-align: center; text-decoration: none; transition: color .16s ease, background-color .16s ease, border-color .16s ease, transform .16s ease; }
 .home-categories a + a { border-left-color: var(--border-soft); }
@@ -138,6 +138,8 @@ svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; s
 .category-tabs a.is-active { color: #fff; border-color: rgb(223 24 48 / 70%); background: rgb(223 24 48 / 18%); box-shadow: inset 0 0 0 1px rgb(223 24 48 / 10%); }
 .menu-list { padding: 0 .75rem 1.4rem; }
 .menu-section { padding-top: 1.05rem; scroll-margin-top: 7.3rem; }
+.js .menu-section { display: none; }
+.js .menu-section.is-active { display: block; }
 .menu-section > .section-heading { margin-bottom: .8rem; }
 .menu-subcategory + .menu-subcategory { margin-top: 1.15rem; }
 .menu-subcategory h3 { display: flex; align-items: center; gap: .55rem; margin: 0 0 .32rem; color: var(--text); font-size: .82rem; font-weight: 750; letter-spacing: .01em; }
