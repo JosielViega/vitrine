@@ -42,6 +42,21 @@ final class AdminAuthServiceTest extends TestCase
         self::assertSame(AdminAuthService::LOGIN_INVALID, $this->service()->attemptLogin('missing', 'wrong'));
     }
 
+    public function testMissingUserStillRunsPasswordVerification(): void
+    {
+        $verifications = 0;
+        $verifier = static function (string $password, string $hash) use (&$verifications): bool {
+            $verifications++;
+
+            return false;
+        };
+
+        $result = $this->service(passwordVerifier: $verifier)->attemptLogin('missing', 'wrong');
+
+        self::assertSame(AdminAuthService::LOGIN_INVALID, $result);
+        self::assertSame(1, $verifications);
+    }
+
     public function testSuccessfulLoginStoresOnlyMinimumIdentityData(): void
     {
         $this->service()->attemptLogin('manager', 'correct-password');
@@ -58,10 +73,31 @@ final class AdminAuthServiceTest extends TestCase
             $regenerations++;
             return true;
         });
+        $service = $this->service($session);
 
-        $this->service($session)->attemptLogin('manager', 'correct-password');
+        $result = $service->attemptLogin('manager', 'correct-password');
 
+        self::assertSame(AdminAuthService::LOGIN_SUCCESS, $result);
+        self::assertTrue($service->check());
         self::assertSame(1, $regenerations);
+    }
+
+    public function testFailedSessionRegenerationDoesNotAuthenticateOrStoreIdentity(): void
+    {
+        $session = new Session(false, static fn (): bool => false);
+        $session->put('cart', ['preserved']);
+        $service = $this->service($session);
+
+        $result = $service->attemptLogin('manager', 'correct-password');
+
+        self::assertSame(AdminAuthService::LOGIN_INVALID, $result);
+        self::assertFalse($service->check());
+        self::assertNull($service->userId());
+        self::assertNull($service->username());
+        self::assertArrayNotHasKey('admin_authenticated', $_SESSION);
+        self::assertArrayNotHasKey('admin_user_id', $_SESSION);
+        self::assertArrayNotHasKey('admin_username', $_SESSION);
+        self::assertSame(['preserved'], $session->get('cart'));
     }
 
     public function testLogoutRemovesOnlyAdminStateAndRegeneratesSession(): void
@@ -117,11 +153,13 @@ final class AdminAuthServiceTest extends TestCase
     private function service(
         ?Session $session = null,
         ?AdminAuthFakeRepository $repository = null,
+        ?\Closure $passwordVerifier = null,
     ): AdminAuthService {
         return new AdminAuthService(
             $repository ?? new AdminAuthFakeRepository(),
-            $session ?? new Session(false),
+            $session ?? new Session(false, static fn (): bool => true),
             static fn (): int => 1_000_000,
+            $passwordVerifier,
         );
     }
 }

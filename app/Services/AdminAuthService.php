@@ -25,6 +25,7 @@ final class AdminAuthService
         private readonly AdminAuthRepositoryInterface $repository,
         private readonly Session $session,
         private readonly ?\Closure $clock = null,
+        private readonly ?\Closure $passwordVerifier = null,
     ) {
     }
 
@@ -39,15 +40,21 @@ final class AdminAuthService
 
         $user = $this->repository->findByUsername($username);
         $hash = $user['password_hash'] ?? self::DUMMY_HASH;
-        if ($user === null || !password_verify($password, $hash)) {
+        $passwordValid = $this->verifyPassword($password, $hash);
+        if ($user === null || !$passwordValid) {
             $attempts[] = $this->now();
             $this->session->put(self::ATTEMPTS_KEY, $attempts);
 
             return self::LOGIN_INVALID;
         }
 
+        if (!$this->session->regenerate()) {
+            $this->clearAuthentication();
+
+            return self::LOGIN_INVALID;
+        }
+
         $this->session->forget(self::ATTEMPTS_KEY);
-        $this->session->regenerate();
         $this->session->put(self::AUTHENTICATED_KEY, true);
         $this->session->put(self::USER_ID_KEY, (int) $user['id']);
         $this->session->put(self::USERNAME_KEY, (string) $user['username']);
@@ -78,11 +85,25 @@ final class AdminAuthService
 
     public function logout(): void
     {
+        $this->clearAuthentication();
+        $this->session->forget(self::ATTEMPTS_KEY);
+        $this->session->regenerate();
+    }
+
+    private function clearAuthentication(): void
+    {
         $this->session->forget(self::AUTHENTICATED_KEY);
         $this->session->forget(self::USER_ID_KEY);
         $this->session->forget(self::USERNAME_KEY);
-        $this->session->forget(self::ATTEMPTS_KEY);
-        $this->session->regenerate();
+    }
+
+    private function verifyPassword(string $password, string $hash): bool
+    {
+        if ($this->passwordVerifier instanceof \Closure) {
+            return (bool) ($this->passwordVerifier)($password, $hash);
+        }
+
+        return password_verify($password, $hash);
     }
 
     private function recentAttempts(): array
