@@ -14,9 +14,24 @@ $logoSize = 'small'; $topbarTitle = null; $topbarBackHref = '/'; $topbarOverlay 
     </div>
     <p class="search-empty" id="search-empty" role="status" hidden>Nenhum item encontrado. Tente outro nome.</p>
     <div class="menu-list">
-        <?php foreach ($menu['categories'] as $category): ?>
-            <section class="menu-section" id="<?= e($category['slug']) ?>" data-category="<?= e($category['slug']) ?>" aria-labelledby="title-<?= e($category['slug']) ?>"><div class="section-heading"><h2 id="title-<?= e($category['slug']) ?>"><?= e($category['name']) ?></h2></div>
-                <?php foreach ($menu['products'] as $product): if ($product['category_id'] === $category['id']): require dirname(__DIR__) . '/components/product-list-item.php'; endif; endforeach; ?>
+        <?php foreach ($menu['categories'] as $category):
+            $categoryProducts = array_values(array_filter($menu['products'], static fn (array $product): bool => $product['category_id'] === $category['id']));
+            if ($categoryProducts === []) { continue; }
+        ?>
+            <section class="menu-section" id="<?= e($category['slug']) ?>" data-category="<?= e($category['slug']) ?>" aria-labelledby="title-<?= e($category['slug']) ?>">
+                <div class="section-heading"><h2 id="title-<?= e($category['slug']) ?>"><?= e($category['name']) ?></h2></div>
+                <?php foreach ($menu['subcategories'] as $subcategory):
+                    if ($subcategory['category_id'] !== $category['id']) { continue; }
+                    $subcategoryProducts = array_values(array_filter($categoryProducts, static fn (array $product): bool => $product['subcategory_id'] === $subcategory['id']));
+                    if ($subcategoryProducts === []) { continue; }
+                ?>
+                    <section class="menu-subcategory" data-subcategory aria-labelledby="subcategory-<?= e((string) $subcategory['id']) ?>">
+                        <h3 id="subcategory-<?= e((string) $subcategory['id']) ?>"><?= e($subcategory['name']) ?></h3>
+                        <div class="subcategory-products">
+                            <?php foreach ($subcategoryProducts as $product): require dirname(__DIR__) . '/components/product-list-item.php'; endforeach; ?>
+                        </div>
+                    </section>
+                <?php endforeach; ?>
             </section>
         <?php endforeach; ?>
     </div>

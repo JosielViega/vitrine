@@ -38,6 +38,8 @@ final class StorefrontTest extends TestCase
         self::assertStringContainsString('Hoje até 21h30', $home->body());
         self::assertSame(200, $menu->status());
         self::assertStringContainsString('Buscar no cardápio', $menu->body());
+        self::assertStringContainsString('class="menu-subcategory"', $menu->body());
+        self::assertStringContainsString('>Porções</h3>', $menu->body());
         self::assertSame(200, $product->status());
         self::assertStringContainsString('R$ 75,00', $product->body());
         self::assertStringContainsString('R$ 62,00', $product->body());

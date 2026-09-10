@@ -49,6 +49,7 @@ function initMenu() {
     if (!menu) return;
     const cards = [...menu.querySelectorAll('[data-product-row]')];
     const sections = [...menu.querySelectorAll('[data-category]')];
+    const subcategories = [...menu.querySelectorAll('[data-subcategory]')];
     const links = [...menu.querySelectorAll('[data-category-link]')];
     const search = menu.querySelector('#menu-search');
     const empty = menu.querySelector('#search-empty');
@@ -60,7 +61,8 @@ function initMenu() {
     search.addEventListener('input', () => {
         const query = normalizeText(search.value); let visibleCount = 0;
         cards.forEach((card) => { const visible = normalizeText(card.dataset.searchName).includes(query); card.hidden = !visible; if (visible) visibleCount += 1; });
-        sections.forEach((section) => { section.hidden = !section.querySelector('[data-product-row]:not([hidden])'); });
+        subcategories.forEach((subcategory) => { subcategory.hidden = !subcategory.querySelector('[data-product-row]:not([hidden])'); });
+        sections.forEach((section) => { section.hidden = !section.querySelector('[data-subcategory]:not([hidden])'); });
         empty.hidden = visibleCount > 0;
     });
     links.forEach((link) => link.addEventListener('click', () => setActive(link.dataset.categoryLink)));
@@ -102,7 +104,7 @@ function initOrder() {
     if (!screen) return;
     const list = screen.querySelector('[data-order-items]'); const empty = screen.querySelector('[data-empty-order]'); const subtotal = screen.querySelector('[data-order-subtotal]'); const total = screen.querySelector('[data-order-total]'); const checkout = screen.querySelector('[data-checkout]'); const checkoutLabel = screen.querySelector('[data-checkout-label]'); const notice = screen.querySelector('[data-checkout-notice]'); const token = screen.querySelector('[data-checkout-token]'); const serviceTypes = [...screen.querySelectorAll('input[name="service_type"]')]; let cart = loadCart(); let businessOpen = screen.dataset.businessOpen === 'true'; let submitting = false;
     const selectedServiceType = () => serviceTypes.find((option) => option.checked)?.value || '';
-    function updateCheckoutState() { checkout.disabled = submitting || !businessOpen || cart.length === 0 || selectedServiceType() === ''; checkoutLabel.textContent = submitting ? 'Validando pedido...' : 'Finalizar pedido no WhatsApp'; }
+    function updateCheckoutState() { checkout.disabled = submitting || !businessOpen || cart.length === 0 || selectedServiceType() === ''; checkout.setAttribute('aria-busy', submitting ? 'true' : 'false'); checkoutLabel.textContent = submitting ? 'Validando pedido...' : 'Finalizar pedido no WhatsApp'; }
     function showCheckoutNotice(message, isError = false) { notice.textContent = message; notice.classList.toggle('is-error', isError); notice.hidden = false; }
     function render() {
         list.replaceChildren();
