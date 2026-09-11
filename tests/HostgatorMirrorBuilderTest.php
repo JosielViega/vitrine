@@ -81,6 +81,7 @@ final class HostgatorMirrorBuilderTest extends TestCase
             'user ini' => ['.user.ini'],
             'PHP ini' => ['php.ini'],
             'uploads' => ['public/uploads/user-file.txt'],
+            'product image upload' => ['public/uploads/products/2026/09/photo.webp'],
             'logs' => ['storage/logs/production.txt'],
             'cache' => ['storage/cache/item.txt'],
         ];

@@ -27,10 +27,12 @@ SQL;
     public const ACTIVE_PRODUCTS_SQL = <<<'SQL'
 SELECT p.id, p.subcategory_id, s.name AS subcategory_name, s.sort_order AS subcategory_sort_order,
        c.id AS category_id, c.name AS category_name, c.sort_order AS category_sort_order,
-       p.name, p.price_cents, p.kind, p.active
+       p.name, p.price_cents, p.kind, p.active, i.path AS storefront_image_path
 FROM products p
 INNER JOIN subcategories s ON s.id = p.subcategory_id
 INNER JOIN categories c ON c.id = s.category_id
+LEFT JOIN storefront_product_image_products ip ON ip.product_id = p.id
+LEFT JOIN storefront_product_images i ON i.id = ip.image_id
 WHERE p.active = 1 AND p.storefront_visible = 1
   AND s.active = 1 AND s.storefront_visible = 1
   AND c.active = 1 AND c.storefront_visible = 1

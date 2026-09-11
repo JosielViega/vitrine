@@ -173,7 +173,7 @@ final class StorefrontCatalogService
                     $variants[] = $this->variant($matchingHalf, 'Meia');
                     $consumed[(int) $matchingHalf['id']] = true;
                 }
-                $products[] = $this->product($row, $baseName, $variants, $categoryById, $subcategoryById);
+                $products[] = $this->product($row, $baseName, $variants, $categoryById, $subcategoryById, $matchingHalf);
                 $consumed[$productId] = true;
             }
             foreach ($subcategoryRows as $row) {
@@ -192,7 +192,9 @@ final class StorefrontCatalogService
                 $product['id'] .= '-' . $product['subcategory_id'];
             }
             $editorial = (array) ($this->presentation['products'][$product['id']] ?? []);
-            $product['image'] = (string) ($editorial['image'] ?? $this->fallbackImage($product['category']));
+            $product['image'] = $product['managed_image']
+                ?? (string) ($editorial['image'] ?? $this->fallbackImage($product['category']));
+            unset($product['managed_image']);
             $product['description'] = isset($editorial['description']) ? (string) $editorial['description'] : null;
         }
         unset($product);
@@ -200,12 +202,24 @@ final class StorefrontCatalogService
         return ['categories' => $publicCategories, 'subcategories' => $publicSubcategories, 'products' => $products];
     }
 
-    private function product(array $row, string $name, array $variants, array $categories, array $subcategories): array
+    private function product(array $row, string $name, array $variants, array $categories, array $subcategories, ?array $secondaryImageRow = null): array
     {
         $category = $categories[(int) $row['category_id']];
         $subcategory = $subcategories[(int) $row['subcategory_id']];
 
-        return ['id' => $this->slug($name) ?: 'produto-' . (int) $row['id'], 'name' => $name, 'category' => $category['slug'], 'category_id' => $category['id'], 'category_name' => $category['name'], 'subcategory_id' => $subcategory['id'], 'subcategory' => $subcategory, 'kinds' => array_values(array_unique(array_column($variants, 'kind'))), 'variants' => $variants];
+        return ['id' => $this->slug($name) ?: 'produto-' . (int) $row['id'], 'name' => $name, 'category' => $category['slug'], 'category_id' => $category['id'], 'category_name' => $category['name'], 'subcategory_id' => $subcategory['id'], 'subcategory' => $subcategory, 'kinds' => array_values(array_unique(array_column($variants, 'kind'))), 'variants' => $variants, 'managed_image' => $this->managedImage($row, $secondaryImageRow)];
+    }
+
+    private function managedImage(array $preferredRow, ?array $secondaryRow): ?string
+    {
+        foreach ([$preferredRow, $secondaryRow] as $imageRow) {
+            $path = is_array($imageRow) ? trim((string) ($imageRow['storefront_image_path'] ?? '')) : '';
+            if ($path !== '') {
+                return $path;
+            }
+        }
+
+        return null;
     }
 
     private function variant(array $row, string $label): array
