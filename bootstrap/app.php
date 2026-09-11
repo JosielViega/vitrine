@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Core\Csrf;
 use App\Core\Database;
+use App\Core\Environment;
 use App\Core\ErrorHandler;
 use App\Core\Logger;
 use App\Core\Request;
@@ -24,7 +25,6 @@ use App\Services\StorefrontProductGroupingService;
 use App\Services\StorefrontVisibilityService;
 use App\Services\WhatsAppCheckoutService;
 use App\Validation\Validator;
-use Dotenv\Dotenv;
 
 $root = dirname(__DIR__);
 $autoload = $root . '/vendor/autoload.php';
@@ -34,7 +34,7 @@ if (!is_file($autoload)) {
 }
 require $autoload;
 
-Dotenv::createImmutable($root)->safeLoad();
+Environment::load($root);
 $appConfig = require $root . '/config/app.php';
 $databaseConfig = require $root . '/config/database.php';
 $businessConfig = require $root . '/config/business.php';

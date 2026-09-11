@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Core\Environment;
+
 require dirname(__DIR__) . '/vendor/autoload.php';
 require __DIR__ . '/lib/Port.php';
 require __DIR__ . '/lib/PortRegistry.php';
 
-Dotenv\Dotenv::createImmutable(dirname(__DIR__))->safeLoad();
+Environment::load(dirname(__DIR__));
 
 $host = '127.0.0.1';
 $port = filter_var(env('APP_PORT'), FILTER_VALIDATE_INT);

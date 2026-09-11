@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 use App\Core\Database;
-use Dotenv\Dotenv;
+use App\Core\Environment;
 $root = dirname(__DIR__);
 require $root . '/vendor/autoload.php';
-Dotenv::createImmutable($root)->safeLoad();
+Environment::load($root);
 
 $config = require $root . '/config/database.php';
 $tables = ['categories', 'subcategories', 'products'];
