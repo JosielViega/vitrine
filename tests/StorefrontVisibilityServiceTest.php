@@ -49,21 +49,38 @@ final class StorefrontVisibilityServiceTest extends TestCase
     public function testCategoryVisibilityDoesNotCascadeToChildren(): void
     {
         $repository = new StorefrontVisibilityFakeRepository();
-        (new StorefrontVisibilityService($repository))->setVisibility('category', 1, false);
+        $repository->productRows[0]['storefront_visible'] = 0;
+        $service = new StorefrontVisibilityService($repository);
+
+        $service->setVisibility('category', 1, false);
+        $service->setVisibility('category', 1, true);
 
         self::assertSame(1, $repository->subcategoryRows[0]['storefront_visible']);
-        self::assertSame(1, $repository->productRows[0]['storefront_visible']);
+        self::assertSame(0, $repository->productRows[0]['storefront_visible']);
     }
 
     public function testSubcategoryVisibilityDoesNotCascadeToProducts(): void
     {
         $repository = new StorefrontVisibilityFakeRepository();
-        (new StorefrontVisibilityService($repository))->setVisibility('subcategory', 1, false);
+        $repository->productRows[0]['storefront_visible'] = 0;
+        $service = new StorefrontVisibilityService($repository);
 
-        self::assertSame(1, $repository->productRows[0]['storefront_visible']);
+        $service->setVisibility('subcategory', 1, false);
+        $service->setVisibility('subcategory', 1, true);
+
+        self::assertSame(0, $repository->productRows[0]['storefront_visible']);
     }
 
-    public function testDashboardExplainsEffectiveVisibilityFromParents(): void
+    public function testVisibleHierarchyAppearsInEveryVisibilitySection(): void
+    {
+        $dashboard = (new StorefrontVisibilityService(new StorefrontVisibilityFakeRepository()))->dashboard();
+
+        self::assertCount(1, $dashboard['categories']);
+        self::assertCount(1, $dashboard['subcategories']);
+        self::assertCount(1, $dashboard['products']);
+    }
+
+    public function testHiddenCategoryRemainsListedWhileItsDescendantsAreFiltered(): void
     {
         $repository = new StorefrontVisibilityFakeRepository();
         $repository->categoryRows[0]['storefront_visible'] = 0;
@@ -71,10 +88,49 @@ final class StorefrontVisibilityServiceTest extends TestCase
         $repository->productRows[0]['category_storefront_visible'] = 0;
         $dashboard = (new StorefrontVisibilityService($repository))->dashboard();
 
+        self::assertCount(1, $dashboard['categories']);
         self::assertSame('Oculto', $dashboard['categories'][0]['effective_status']);
-        self::assertSame('Oculto pela categoria', $dashboard['subcategories'][0]['effective_status']);
-        self::assertSame('Oculto pela categoria', $dashboard['products'][0]['effective_status']);
-        self::assertSame(1, $dashboard['products'][0]['storefront_visible']);
+        self::assertSame([], $dashboard['subcategories']);
+        self::assertSame([], $dashboard['products']);
+    }
+
+    public function testHiddenSubcategoryRemainsListedWhileItsProductsAreFiltered(): void
+    {
+        $repository = new StorefrontVisibilityFakeRepository();
+        $repository->subcategoryRows[0]['storefront_visible'] = 0;
+        $repository->productRows[0]['subcategory_storefront_visible'] = 0;
+        $dashboard = (new StorefrontVisibilityService($repository))->dashboard();
+
+        self::assertCount(1, $dashboard['subcategories']);
+        self::assertSame('Oculto', $dashboard['subcategories'][0]['effective_status']);
+        self::assertSame([], $dashboard['products']);
+    }
+
+    public function testHiddenProductRemainsListedWithItsOwnStatus(): void
+    {
+        $repository = new StorefrontVisibilityFakeRepository();
+        $repository->productRows[0]['storefront_visible'] = 0;
+        $dashboard = (new StorefrontVisibilityService($repository))->dashboard();
+
+        self::assertCount(1, $dashboard['products']);
+        self::assertSame(0, $dashboard['products'][0]['storefront_visible']);
+        self::assertSame('Oculto', $dashboard['products'][0]['effective_status']);
+    }
+
+    public function testOperationalActiveDoesNotControlAdministrativeFiltering(): void
+    {
+        $repository = new StorefrontVisibilityFakeRepository();
+        $repository->categoryRows[0]['active'] = 0;
+        $repository->subcategoryRows[0]['category_active'] = 0;
+        $repository->productRows[0]['category_active'] = 0;
+        $dashboard = (new StorefrontVisibilityService($repository))->dashboard();
+
+        self::assertCount(1, $dashboard['categories']);
+        self::assertCount(1, $dashboard['subcategories']);
+        self::assertCount(1, $dashboard['products']);
+        self::assertSame('Inativo no sistema', $dashboard['categories'][0]['effective_status']);
+        self::assertSame('Categoria inativa no sistema', $dashboard['subcategories'][0]['effective_status']);
+        self::assertSame('Categoria inativa no sistema', $dashboard['products'][0]['effective_status']);
     }
 
     public function testUnknownItemReturnsFalse(): void

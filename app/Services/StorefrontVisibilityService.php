@@ -14,10 +14,20 @@ final class StorefrontVisibilityService
 
     public function dashboard(): array
     {
+        $subcategories = array_values(array_filter(
+            $this->repository->subcategories(),
+            static fn (array $item): bool => (int) $item['category_storefront_visible'] === 1,
+        ));
+        $products = array_values(array_filter(
+            $this->repository->products(),
+            static fn (array $item): bool => (int) $item['category_storefront_visible'] === 1
+                && (int) $item['subcategory_storefront_visible'] === 1,
+        ));
+
         return [
             'categories' => array_map($this->category(...), $this->repository->categories()),
-            'subcategories' => array_map($this->subcategory(...), $this->repository->subcategories()),
-            'products' => array_map($this->product(...), $this->repository->products()),
+            'subcategories' => array_map($this->subcategory(...), $subcategories),
+            'products' => array_map($this->product(...), $products),
         ];
     }
 

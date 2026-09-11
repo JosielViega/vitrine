@@ -116,6 +116,8 @@ final class ProductImageServiceTest extends TestCase
     {
         $this->repository->rows[0]['active'] = 0;
         $this->repository->rows[1]['storefront_visible'] = 0;
+        $this->repository->rows[0]['category_storefront_visible'] = 0;
+        $this->repository->rows[1]['subcategory_storefront_visible'] = 0;
         $groups = $this->service->groups();
 
         self::assertCount(1, $groups);
