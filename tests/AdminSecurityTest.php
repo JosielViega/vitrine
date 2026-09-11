@@ -56,6 +56,19 @@ final class AdminSecurityTest extends TestCase
         self::assertStringNotContainsString("get('/admin/visibility'", $routes);
     }
 
+    public function testVisibilityRequestCapturesCheckedStateBeforeDisablingToggle(): void
+    {
+        $source = $this->source('public/assets/js/admin.js');
+
+        self::assertMatchesRegularExpression(
+            "/const visible = toggle\.checked;\s+const formData = new FormData\(form\);\s+formData\.set\('visible', visible \? '1' : '0'\);\s+toggle\.disabled = true;/",
+            $source,
+        );
+        self::assertSame(1, substr_count($source, "formData.set('visible', visible ? '1' : '0')"));
+        self::assertStringContainsString('body: formData', $source);
+        self::assertStringNotContainsString('body: new FormData(form)', $source);
+    }
+
     private function source(string $relativePath): string
     {
         $source = file_get_contents(dirname(__DIR__) . '/' . $relativePath);

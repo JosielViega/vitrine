@@ -39,13 +39,16 @@
 
         toggle.addEventListener('change', async () => {
             const previous = !toggle.checked;
+            const visible = toggle.checked;
+            const formData = new FormData(form);
+            formData.set('visible', visible ? '1' : '0');
             toggle.disabled = true;
             form.classList.add('is-saving');
 
             try {
                 const response = await fetch(form.action, {
                     method: 'POST',
-                    body: new FormData(form),
+                    body: formData,
                     headers: { Accept: 'application/json' },
                     credentials: 'same-origin',
                 });
