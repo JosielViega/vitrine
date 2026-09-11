@@ -10,17 +10,22 @@ function loadCart() {
         const stored = JSON.parse(window.localStorage.getItem(CART_KEY) || '[]');
         if (!Array.isArray(stored)) return [];
         return stored.filter((item) => item && Number.isSafeInteger(item.productId) && item.productId > 0 && typeof item.publicProductId === 'string' && typeof item.name === 'string' && Number.isSafeInteger(item.priceCents) && item.priceCents >= 0 && Number.isInteger(item.quantity))
-            .map((item) => ({
-                key: `${item.productId}:${item.publicProductId}:${normalizeText(String(item.notes || ''))}`,
-                productId: item.productId,
-                publicProductId: item.publicProductId,
-                name: item.name,
-                variantLabel: String(item.variantLabel || ''),
-                priceCents: item.priceCents,
-                quantity: Math.max(1, item.quantity),
-                notes: String(item.notes || '').slice(0, 180),
-                image: String(item.image || '').startsWith('/assets/images/') ? item.image : '',
-            }));
+            .map((item) => {
+                const addons = normalizeAddons(item.addons);
+                const notes = String(item.notes || '').slice(0, 180);
+                return {
+                    key: cartLineKey(item.productId, item.publicProductId, addons, notes),
+                    productId: item.productId,
+                    publicProductId: item.publicProductId,
+                    name: item.name,
+                    variantLabel: String(item.variantLabel || ''),
+                    priceCents: item.priceCents,
+                    quantity: Math.max(1, item.quantity),
+                    addons,
+                    notes,
+                    image: String(item.image || '').startsWith('/assets/images/') ? item.image : '',
+                };
+            });
     } catch {
         return [];
     }
@@ -37,6 +42,16 @@ function updateCartIndicators(cart = loadCart()) {
     document.querySelectorAll('[data-cart-count]').forEach((badge) => { badge.textContent = String(count); badge.hidden = count === 0; });
 }
 function normalizeText(value) { return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+function normalizeAddons(addons) {
+    if (!Array.isArray(addons)) return [];
+    return addons.filter((addon) => addon && Number.isSafeInteger(addon.productId) && addon.productId > 0 && typeof addon.name === 'string' && Number.isSafeInteger(addon.priceCents) && addon.priceCents >= 0)
+        .map((addon) => ({ productId: addon.productId, name: addon.name, priceCents: addon.priceCents }))
+        .sort((left, right) => left.productId - right.productId);
+}
+function cartLineKey(productId, publicProductId, addons, notes) {
+    return [productId, publicProductId, addons.map((addon) => addon.productId).join(','), normalizeText(notes)].join(':');
+}
+function itemUnitPrice(item) { return item.priceCents + item.addons.reduce((sum, addon) => sum + addon.priceCents, 0); }
 function showToast(message) {
     const toast = document.querySelector('[data-toast]');
     if (!toast) return;
@@ -114,10 +129,15 @@ function initProduct() {
         const priceCents = Number(variant.dataset.priceCents);
         if (!Number.isSafeInteger(productId) || !Number.isSafeInteger(priceCents)) return;
         const notes = form.querySelector('[data-notes]').value.trim();
-        const key = `${productId}:${form.dataset.publicProductId}:${normalizeText(notes)}`;
+        const addons = normalizeAddons([...form.querySelectorAll('input[name="addons[]"]:checked')].map((addon) => ({
+            productId: Number(addon.value),
+            name: addon.dataset.addonName,
+            priceCents: Number(addon.dataset.priceCents),
+        })));
+        const key = cartLineKey(productId, form.dataset.publicProductId, addons, notes);
         const cart = loadCart(); const existing = cart.find((item) => item.key === key);
         if (existing) existing.quantity += quantity;
-        else cart.push({ key, productId, publicProductId: form.dataset.publicProductId, name: form.dataset.productName, variantLabel: variant.dataset.label, priceCents, quantity, notes, image: form.dataset.productImage });
+        else cart.push({ key, productId, publicProductId: form.dataset.publicProductId, name: form.dataset.productName, variantLabel: variant.dataset.label, priceCents, quantity, addons, notes, image: form.dataset.productImage });
         saveCart(cart); showToast(`${form.dataset.productName} adicionado`);
         window.setTimeout(() => { window.location.href = '/pedido'; }, 250);
     });
@@ -142,8 +162,19 @@ function initOrder() {
             const copy = document.createElement('div'); copy.className = 'order-item-copy';
             const name = document.createElement('h2'); name.textContent = item.name;
             const variant = document.createElement('p'); variant.textContent = item.variantLabel || 'Unidade';
-            const price = document.createElement('strong'); price.textContent = currency.format((item.priceCents * item.quantity) / 100);
-            copy.append(name, variant, price);
+            copy.append(name, variant);
+            if (item.addons.length > 0) {
+                const addons = document.createElement('ul'); addons.className = 'order-item-addons';
+                item.addons.forEach((addon) => {
+                    const entry = document.createElement('li');
+                    const addonName = document.createElement('span'); addonName.textContent = '+ ' + addon.name;
+                    const addonPrice = document.createElement('span'); addonPrice.textContent = currency.format(addon.priceCents / 100);
+                    entry.append(addonName, addonPrice); addons.append(entry);
+                });
+                copy.append(addons);
+            }
+            const price = document.createElement('strong'); price.textContent = currency.format((itemUnitPrice(item) * item.quantity) / 100);
+            copy.append(price);
             if (item.notes) { const notes = document.createElement('small'); notes.textContent = item.notes; copy.append(notes); }
             const controls = document.createElement('div'); controls.className = 'order-item-controls';
             controls.append(createQuantityButton(`Diminuir quantidade de ${item.name}`, '−', () => change(item.key, -1)), Object.assign(document.createElement('strong'), { textContent: String(item.quantity) }), createQuantityButton(`Aumentar quantidade de ${item.name}`, '+', () => change(item.key, 1)));
@@ -151,7 +182,7 @@ function initOrder() {
             remove.addEventListener('click', () => { cart = cart.filter((candidate) => candidate.key !== item.key); persistAndRender(); showToast(`${item.name} removido`); });
             row.append(image, copy, controls, remove); list.append(row);
         });
-        const valueCents = cart.reduce((sum, item) => sum + (item.priceCents * item.quantity), 0);
+        const valueCents = cart.reduce((sum, item) => sum + (itemUnitPrice(item) * item.quantity), 0);
         subtotal.textContent = currency.format(valueCents / 100); total.textContent = currency.format(valueCents / 100);
         empty.hidden = cart.length > 0; updateCheckoutState();
     }

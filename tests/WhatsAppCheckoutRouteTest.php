@@ -35,6 +35,28 @@ final class WhatsAppCheckoutRouteTest extends TestCase
         self::assertStringStartsWith('https://wa.me/5527998586163?text=', $data['whatsapp_url']);
     }
 
+    public function testAddonCheckoutRouteReturnsAuthoritativeWhatsAppUrl(): void
+    {
+        $body = $this->validBody();
+        $body['cart'] = json_encode([[
+            'productId' => 82,
+            'priceCents' => 7200,
+            'quantity' => 2,
+            'addons' => [
+                ['productId' => 117, 'name' => 'Alterado', 'priceCents' => 600],
+                ['productId' => 74, 'name' => 'Alterado', 'priceCents' => 600],
+            ],
+            'notes' => '',
+        ]], JSON_THROW_ON_ERROR);
+        $response = $this->responseAt('2026-09-10 18:00:00', $body);
+        $data = json_decode($response->body(), true, 8, JSON_THROW_ON_ERROR);
+
+        self::assertSame(200, $response->status());
+        self::assertTrue($data['ok']);
+        self::assertSame(16800, $data['total_cents']);
+        self::assertStringStartsWith('https://wa.me/', $data['whatsapp_url']);
+    }
+
     public function testClosedCheckoutRouteReturnsConflict(): void
     {
         $response = $this->responseAt('2026-09-10 21:30:00', $this->validBody());
@@ -94,10 +116,15 @@ final class WhatsAppCheckoutRouteTest extends TestCase
     private function catalog(): StorefrontCatalogService
     {
         $categories = [['id' => 1, 'name' => 'Comidas', 'sort_order' => 0, 'active' => 1]];
-        $subcategories = [['id' => 1, 'category_id' => 1, 'name' => 'Porções', 'sort_order' => 0, 'active' => 1]];
+        $subcategories = [
+            ['id' => 1, 'category_id' => 1, 'name' => 'Porções', 'sort_order' => 0, 'active' => 1],
+            ['id' => 2, 'category_id' => 1, 'name' => 'Acréscimo', 'sort_order' => 1, 'active' => 1],
+        ];
         $products = [
             ['id' => 79, 'subcategory_id' => 1, 'category_id' => 1, 'name' => 'Camarão c/ Batata e Aipim', 'price_cents' => 8500, 'kind' => 'kitchen', 'active' => 1],
             ['id' => 82, 'subcategory_id' => 1, 'category_id' => 1, 'name' => 'Meia: Camarão c/ Batata e Aipim', 'price_cents' => 7200, 'kind' => 'kitchen', 'active' => 1],
+            ['id' => 117, 'subcategory_id' => 2, 'category_id' => 1, 'name' => 'Bacon', 'price_cents' => 600, 'kind' => 'regular', 'active' => 1],
+            ['id' => 74, 'subcategory_id' => 2, 'category_id' => 1, 'name' => 'Mussarela', 'price_cents' => 600, 'kind' => 'regular', 'active' => 1],
         ];
         $repository = new class($categories, $subcategories, $products) implements StorefrontCatalogRepository {
             public function __construct(private array $categories, private array $subcategories, private array $products) {}
@@ -106,6 +133,12 @@ final class WhatsAppCheckoutRouteTest extends TestCase
             public function activeProducts(): array { return $this->products; }
         };
 
-        return new StorefrontCatalogService($repository, ['fallback_image' => '/assets/images/products/mixed-portion-placeholder.jpg']);
+        return new StorefrontCatalogService($repository, [
+            'addons' => [
+                'product_ids' => [117, 74],
+                'eligible_subcategories' => ['porcoes'],
+            ],
+            'fallback_image' => '/assets/images/products/mixed-portion-placeholder.jpg',
+        ]);
     }
 }

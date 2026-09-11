@@ -144,15 +144,36 @@ final class StorefrontCatalogService
             $publicSubcategories[] = $entry;
         }
 
+        $addonProductIds = $this->addonProductIds();
+        $addonRows = [];
         $publishableRows = [];
         foreach ($rows as $row) {
             $subcategoryId = (int) $row['subcategory_id'];
             $categoryId = (int) $row['category_id'];
-            if ((int) ($row['active'] ?? 1) !== 1 || !isset($subcategoryById[$subcategoryId], $categoryById[$categoryId])) {
+            if ((int) ($row['active'] ?? 1) !== 1
+                || (int) ($row['storefront_visible'] ?? 1) !== 1
+                || !isset($subcategoryById[$subcategoryId], $categoryById[$categoryId])) {
+                continue;
+            }
+            $productId = (int) $row['id'];
+            if (isset($addonProductIds[$productId])) {
+                $addonRows[$productId] = [
+                    'product_id' => $productId,
+                    'name' => (string) $row['name'],
+                    'price_cents' => (int) $row['price_cents'],
+                ];
                 continue;
             }
             $publishableRows[] = $row;
         }
+
+        $availableAddons = [];
+        foreach (array_keys($addonProductIds) as $productId) {
+            if (isset($addonRows[$productId])) {
+                $availableAddons[] = $addonRows[$productId];
+            }
+        }
+        $eligibleSubcategories = $this->eligibleAddonSubcategories();
 
         $products = [];
         foreach ($this->grouping->group($publishableRows) as $group) {
@@ -168,6 +189,10 @@ final class StorefrontCatalogService
                 $subcategoryById,
                 $group['secondary_row'],
             );
+            $lastIndex = array_key_last($products);
+            $products[$lastIndex]['addons'] = isset($eligibleSubcategories[$products[$lastIndex]['subcategory']['slug']])
+                ? $availableAddons
+                : [];
         }
 
         $slugCounts = array_count_values(array_column($products, 'id'));
@@ -183,7 +208,39 @@ final class StorefrontCatalogService
         }
         unset($product);
 
+        $productSubcategoryIds = array_fill_keys(array_column($products, 'subcategory_id'), true);
+        $publicSubcategories = array_values(array_filter(
+            $publicSubcategories,
+            static fn (array $subcategory): bool => isset($productSubcategoryIds[$subcategory['id']]),
+        ));
+
         return ['categories' => $publicCategories, 'subcategories' => $publicSubcategories, 'products' => $products];
+    }
+
+    /** @return array<int, true> */
+    private function addonProductIds(): array
+    {
+        $ids = [];
+        foreach ((array) ($this->presentation['addons']['product_ids'] ?? []) as $productId) {
+            if (is_int($productId) && $productId > 0) {
+                $ids[$productId] = true;
+            }
+        }
+
+        return $ids;
+    }
+
+    /** @return array<string, true> */
+    private function eligibleAddonSubcategories(): array
+    {
+        $slugs = [];
+        foreach ((array) ($this->presentation['addons']['eligible_subcategories'] ?? []) as $subcategory) {
+            if (is_string($subcategory) && ($slug = $this->grouping->slug($subcategory)) !== '') {
+                $slugs[$slug] = true;
+            }
+        }
+
+        return $slugs;
     }
 
     private function product(array $row, string $name, array $variants, array $categories, array $subcategories, ?array $secondaryImageRow = null): array

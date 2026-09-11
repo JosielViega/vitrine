@@ -87,10 +87,20 @@ final class WhatsAppCheckoutService
             $product = $resolved['product'];
             $variant = $resolved['variant'];
             $priceCents = (int) $variant['price_cents'];
+            $addonResult = $this->authoritativeAddons($item['addons'] ?? [], (array) ($product['addons'] ?? []));
+            if ($addonResult === null) {
+                return $this->error(422, 'cart_invalid', 'Não foi possível validar os acréscimos do pedido.');
+            }
+
+            $addons = $addonResult['addons'];
+            $unitPriceCents = $priceCents + array_sum(array_column($addons, 'priceCents'));
             $sanitizedNotes = $this->sanitizeNotes($notes);
-            $lineTotal = $priceCents * $quantity;
+            $lineTotal = $unitPriceCents * $quantity;
             $totalCents += $lineTotal;
-            $priceChanged = $priceChanged || !is_int($item['priceCents'] ?? null) || $item['priceCents'] !== $priceCents;
+            $priceChanged = $priceChanged
+                || !is_int($item['priceCents'] ?? null)
+                || $item['priceCents'] !== $priceCents
+                || $addonResult['price_changed'];
             $authoritativeItems[] = [
                 'productId' => (int) $variant['product_id'],
                 'publicProductId' => (string) $product['id'],
@@ -98,6 +108,7 @@ final class WhatsAppCheckoutService
                 'variantLabel' => (string) $variant['label'],
                 'priceCents' => $priceCents,
                 'quantity' => $quantity,
+                'addons' => $addons,
                 'notes' => $sanitizedNotes,
                 'image' => (string) $product['image'],
             ];
@@ -124,6 +135,48 @@ final class WhatsAppCheckoutService
             'whatsapp_url' => 'https://wa.me/' . $this->number . '?text=' . rawurlencode($message),
             'total_cents' => $totalCents,
         ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $availableAddons
+     * @return null|array{addons: list<array{productId: int, name: string, priceCents: int}>, price_changed: bool}
+     */
+    private function authoritativeAddons(mixed $payload, array $availableAddons): ?array
+    {
+        if (!is_array($payload) || !array_is_list($payload) || count($payload) > count($availableAddons)) {
+            return null;
+        }
+
+        $availableById = [];
+        foreach ($availableAddons as $addon) {
+            $availableById[(int) $addon['product_id']] = $addon;
+        }
+
+        $addons = [];
+        $seen = [];
+        $priceChanged = false;
+        foreach ($payload as $submittedAddon) {
+            $productId = is_array($submittedAddon) ? ($submittedAddon['productId'] ?? null) : null;
+            if (!is_int($productId) || $productId <= 0 || isset($seen[$productId]) || !isset($availableById[$productId])) {
+                return null;
+            }
+
+            $seen[$productId] = true;
+            $addon = $availableById[$productId];
+            $priceCents = (int) $addon['price_cents'];
+            $priceChanged = $priceChanged
+                || !is_int($submittedAddon['priceCents'] ?? null)
+                || $submittedAddon['priceCents'] !== $priceCents;
+            $addons[] = [
+                'productId' => $productId,
+                'name' => (string) $addon['name'],
+                'priceCents' => $priceCents,
+            ];
+        }
+
+        usort($addons, static fn (array $left, array $right): int => $left['productId'] <=> $right['productId']);
+
+        return ['addons' => $addons, 'price_changed' => $priceChanged];
     }
 
     /** @return null|list<mixed> */
@@ -169,15 +222,22 @@ final class WhatsAppCheckoutService
         $lines = ['Olá! Gostaria de fazer um pedido na Bar e Lanchonete São Jorge.', '', '*PEDIDO*', ''];
         foreach ($items as $item) {
             $quantity = (int) $item['quantity'];
-            $priceCents = (int) $item['priceCents'];
-            $lineTotal = $priceCents * $quantity;
+            $unitPriceCents = (int) $item['priceCents'] + array_sum(array_column($item['addons'], 'priceCents'));
+            $lineTotal = $unitPriceCents * $quantity;
             $lines[] = $quantity . 'x ' . $item['name'];
             if ($item['variantLabel'] !== '') {
                 $lines[] = 'Tamanho: ' . $item['variantLabel'];
             }
+            if ($item['addons'] !== []) {
+                $lines[] = 'Acréscimos:';
+                foreach ($item['addons'] as $addon) {
+                    $suffix = $quantity > 1 ? ' por unidade' : '';
+                    $lines[] = '- ' . $addon['name'] . ' (+' . $this->currency((int) $addon['priceCents']) . $suffix . ')';
+                }
+            }
             $lines[] = $quantity === 1
-                ? $this->currency($priceCents)
-                : $quantity . ' x ' . $this->currency($priceCents) . ' = ' . $this->currency($lineTotal);
+                ? $this->currency($unitPriceCents)
+                : $quantity . ' x ' . $this->currency($unitPriceCents) . ' = ' . $this->currency($lineTotal);
             if ($item['notes'] !== '') {
                 $lines[] = 'Observação do ' . $item['name'] . ':';
                 $lines[] = $item['notes'];

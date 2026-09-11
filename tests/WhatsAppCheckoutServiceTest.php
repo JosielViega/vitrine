@@ -183,23 +183,169 @@ final class WhatsAppCheckoutServiceTest extends TestCase
         self::assertSame('cart_invalid', $result['code']);
     }
 
-    private function service(string $dateTime = '2026-09-10 18:00:00', string $number = '5527998586163'): WhatsAppCheckoutService
+    #[DataProvider('validAddonCombinationProvider')]
+    public function testAcceptsEveryAddonCombination(array $addons, int $expectedTotal): void
+    {
+        $result = $this->service()->checkout([$this->itemWithAddons(82, 7200, $addons)], 'pickup');
+
+        self::assertTrue($result['ok']);
+        self::assertSame($expectedTotal, $result['total_cents']);
+    }
+
+    public static function validAddonCombinationProvider(): array
+    {
+        return [
+            'none' => [[], 7200],
+            'Bacon' => [[['productId' => 117, 'name' => 'Alterado', 'priceCents' => 600]], 7800],
+            'Mussarela' => [[['productId' => 74, 'name' => 'Alterado', 'priceCents' => 600]], 7800],
+            'both' => [[
+                ['productId' => 117, 'name' => 'Alterado', 'priceCents' => 600],
+                ['productId' => 74, 'name' => 'Alterado', 'priceCents' => 600],
+            ], 8400],
+        ];
+    }
+
+    public function testRejectsAddonOnIneligibleProduct(): void
+    {
+        $result = $this->service()->checkout([
+            $this->itemWithAddons(3, 700, [$this->addon(117)]),
+        ], 'pickup');
+
+        self::assertSame('cart_invalid', $result['code']);
+    }
+
+    #[DataProvider('directAddonProvider')]
+    public function testRejectsAddonAsMainProduct(int $productId): void
+    {
+        $result = $this->service()->checkout([$this->item($productId, 600)], 'pickup');
+
+        self::assertSame('cart_invalid', $result['code']);
+        self::assertSame([$productId], $result['invalid_product_ids']);
+    }
+
+    public static function directAddonProvider(): array
+    {
+        return ['Bacon' => [117], 'Mussarela' => [74]];
+    }
+
+    public function testRejectsUnknownAndDuplicateAddons(): void
+    {
+        $unknown = $this->service()->checkout([
+            $this->itemWithAddons(82, 7200, [$this->addon(999)]),
+        ], 'pickup');
+        $duplicate = $this->service()->checkout([
+            $this->itemWithAddons(82, 7200, [$this->addon(117), $this->addon(117)]),
+        ], 'pickup');
+
+        self::assertSame('cart_invalid', $unknown['code']);
+        self::assertSame('cart_invalid', $duplicate['code']);
+    }
+
+    #[DataProvider('malformedAddonProvider')]
+    public function testRejectsMalformedAddonPayload(mixed $addons): void
+    {
+        $item = $this->item(82, 7200);
+        $item['addons'] = $addons;
+
+        self::assertSame('cart_invalid', $this->service()->checkout([$item], 'pickup')['code']);
+    }
+
+    public static function malformedAddonProvider(): array
+    {
+        return [
+            'not a list' => [['addon' => ['productId' => 117, 'priceCents' => 600]]],
+            'not an object' => [[117]],
+            'invalid id' => [[['productId' => -1, 'priceCents' => 600]]],
+            'nested id' => [[['productId' => [117], 'priceCents' => 600]]],
+            'too many' => [[
+                ['productId' => 117, 'priceCents' => 600],
+                ['productId' => 74, 'priceCents' => 600],
+                ['productId' => 999, 'priceCents' => 600],
+            ]],
+        ];
+    }
+
+    #[DataProvider('unavailableAddonProvider')]
+    public function testRejectsUnavailableAddon(int $active, int $visible): void
+    {
+        $catalog = $this->catalog($active, $visible);
+        $result = $this->service(catalog: $catalog)->checkout([
+            $this->itemWithAddons(82, 7200, [$this->addon(117)]),
+        ], 'pickup');
+
+        self::assertSame('cart_invalid', $result['code']);
+    }
+
+    public static function unavailableAddonProvider(): array
+    {
+        return ['inactive' => [0, 1], 'hidden' => [1, 0]];
+    }
+
+    public function testChangedAddonPriceReturnsAuthoritativeCart(): void
+    {
+        $result = $this->service()->checkout([
+            $this->itemWithAddons(82, 7200, [$this->addon(117, 500)]),
+        ], 'pickup');
+
+        self::assertSame('cart_changed', $result['code']);
+        self::assertSame(600, $result['cart'][0]['addons'][0]['priceCents']);
+        self::assertSame('Bacon', $result['cart'][0]['addons'][0]['name']);
+        self::assertSame(7800, $result['total_cents']);
+    }
+
+    public function testQuantityMultipliesBaseAndAddonsAndMessageIsExplicit(): void
+    {
+        $result = $this->service()->checkout([
+            $this->itemWithAddons(82, 7200, [$this->addon(117), $this->addon(74)], 2),
+        ], 'pickup');
+        $message = $this->message($result);
+
+        self::assertSame(16800, $result['total_cents']);
+        self::assertStringContainsString("Acréscimos:
+- Mussarela (+R$ 6,00 por unidade)
+- Bacon (+R$ 6,00 por unidade)", $message);
+        self::assertStringContainsString('2 x R$ 84,00 = R$ 168,00', $message);
+        self::assertStringContainsString('*Total: R$ 168,00*', $message);
+    }
+
+    public function testLegacyCartItemWithoutAddonsRemainsValid(): void
+    {
+        $item = $this->item(82, 7200);
+        self::assertArrayNotHasKey('addons', $item);
+
+        $result = $this->service()->checkout([$item], 'pickup');
+
+        self::assertTrue($result['ok']);
+        self::assertSame(7200, $result['total_cents']);
+    }
+
+    private function service(
+        string $dateTime = '2026-09-10 18:00:00',
+        string $number = '5527998586163',
+        ?StorefrontCatalogService $catalog = null,
+    ): WhatsAppCheckoutService
     {
         $now = new DateTimeImmutable($dateTime, new DateTimeZone('America/Sao_Paulo'));
         $hours = new BusinessHoursService(require dirname(__DIR__) . '/config/business.php', static fn (): DateTimeImmutable => $now);
 
-        return new WhatsAppCheckoutService($hours, $this->catalog(), ['number' => $number]);
+        return new WhatsAppCheckoutService($hours, $catalog ?? $this->catalog(), ['number' => $number]);
     }
 
-    private function catalog(): StorefrontCatalogService
+    private function catalog(int $baconActive = 1, int $baconVisible = 1): StorefrontCatalogService
     {
         $categories = [['id' => 1, 'name' => 'Comidas', 'sort_order' => 0, 'active' => 1], ['id' => 2, 'name' => 'Bebidas', 'sort_order' => 0, 'active' => 1]];
-        $subcategories = [['id' => 1, 'category_id' => 1, 'name' => 'Porções', 'sort_order' => 0, 'active' => 1], ['id' => 2, 'category_id' => 2, 'name' => 'Cervejas', 'sort_order' => 0, 'active' => 1]];
+        $subcategories = [
+            ['id' => 1, 'category_id' => 1, 'name' => 'Porções', 'sort_order' => 0, 'active' => 1],
+            ['id' => 2, 'category_id' => 2, 'name' => 'Cervejas', 'sort_order' => 0, 'active' => 1],
+            ['id' => 3, 'category_id' => 1, 'name' => 'Acréscimo', 'sort_order' => 1, 'active' => 1],
+        ];
         $products = [
             ['id' => 79, 'subcategory_id' => 1, 'category_id' => 1, 'name' => 'Camarão c/ Batata e Aipim', 'price_cents' => 8500, 'kind' => 'kitchen', 'active' => 1],
             ['id' => 82, 'subcategory_id' => 1, 'category_id' => 1, 'name' => 'Meia: Camarão c/ Batata e Aipim', 'price_cents' => 7200, 'kind' => 'kitchen', 'active' => 1],
             ['id' => 3, 'subcategory_id' => 2, 'category_id' => 2, 'name' => 'Brahma Latão', 'price_cents' => 700, 'kind' => 'regular', 'active' => 1],
             ['id' => 90, 'subcategory_id' => 1, 'category_id' => 1, 'name' => 'Produto inativo', 'price_cents' => 100, 'kind' => 'regular', 'active' => 0],
+            ['id' => 117, 'subcategory_id' => 3, 'category_id' => 1, 'name' => 'Bacon', 'price_cents' => 600, 'kind' => 'regular', 'active' => $baconActive, 'storefront_visible' => $baconVisible],
+            ['id' => 74, 'subcategory_id' => 3, 'category_id' => 1, 'name' => 'Mussarela', 'price_cents' => 600, 'kind' => 'regular', 'active' => 1, 'storefront_visible' => 1],
         ];
         $repository = new class($categories, $subcategories, $products) implements StorefrontCatalogRepository {
             public function __construct(private array $categories, private array $subcategories, private array $products) {}
@@ -208,12 +354,28 @@ final class WhatsAppCheckoutServiceTest extends TestCase
             public function activeProducts(): array { return $this->products; }
         };
 
-        return new StorefrontCatalogService($repository, ['fallback_image' => '/assets/images/products/mixed-portion-placeholder.jpg']);
+        return new StorefrontCatalogService($repository, [
+            'addons' => [
+                'product_ids' => [117, 74],
+                'eligible_subcategories' => ['porcoes'],
+            ],
+            'fallback_image' => '/assets/images/products/mixed-portion-placeholder.jpg',
+        ]);
     }
 
     private function item(int $productId, int $priceCents, int $quantity = 1): array
     {
         return ['productId' => $productId, 'publicProductId' => 'ignored', 'name' => 'Manipulado', 'variantLabel' => 'Manipulado', 'priceCents' => $priceCents, 'quantity' => $quantity, 'notes' => ''];
+    }
+
+    private function itemWithAddons(int $productId, int $priceCents, array $addons, int $quantity = 1): array
+    {
+        return [...$this->item($productId, $priceCents, $quantity), 'addons' => $addons];
+    }
+
+    private function addon(int $productId, int $priceCents = 600): array
+    {
+        return ['productId' => $productId, 'name' => 'Valor enviado pelo cliente', 'priceCents' => $priceCents];
     }
 
     private function message(array $result): string

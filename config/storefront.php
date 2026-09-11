@@ -8,6 +8,10 @@ return [
     'variant_aliases' => [
         'porcao-carne' => 'porcao-de-carne',
     ],
+    'addons' => [
+        'product_ids' => [117, 74],
+        'eligible_subcategories' => ['porcoes'],
+    ],
     'fallback_image' => '/assets/images/products/mixed-portion-placeholder.jpg',
     'fallback_images' => [
         'bebidas' => '/assets/images/storefront/drinks-placeholder.jpg',
