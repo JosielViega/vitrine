@@ -12,9 +12,14 @@ use App\Core\Session;
 use App\Core\View;
 use App\Repositories\AdminAuthRepositoryInterface;
 use App\Repositories\StorefrontCatalogRepository;
+use App\Repositories\StorefrontProductImageRepositoryInterface;
 use App\Services\AdminAuthService;
 use App\Services\BusinessHoursService;
+use App\Services\ProductImageProcessor;
+use App\Services\ProductImageService;
+use App\Services\ProductImageStorage;
 use App\Services\StorefrontCatalogService;
+use App\Services\StorefrontProductGroupingService;
 use App\Services\StorefrontVisibilityService;
 use App\Services\WhatsAppCheckoutService;
 use PHPUnit\Framework\TestCase;
@@ -84,6 +89,53 @@ final class AdminRouteTest extends TestCase
         self::assertSame(403, $response->status());
     }
 
+    public function testImageUploadWithoutAuthenticationIsBlocked(): void
+    {
+        $response = $this->dispatch($this->request('POST', '/admin/images/upload'));
+        self::assertSame(303, $response->status());
+        self::assertSame('/admin/login', $response->headers()['Location']);
+    }
+
+    public function testImageUploadWithInvalidCsrfIsBlocked(): void
+    {
+        $this->authenticateSession();
+        $response = $this->dispatch($this->request('POST', '/admin/images/upload', ['_token' => 'invalid', 'group_id' => 'product-79']));
+        self::assertSame(403, $response->status());
+    }
+
+    public function testImageUploadWithInvalidGroupIsRejectedServerSide(): void
+    {
+        $this->authenticateSession();
+        $session = new Session(false);
+        $csrf = new Csrf($session);
+        $response = $this->dispatch($this->request('POST', '/admin/images/upload', ['_token' => $csrf->token(), 'group_id' => 'product-999']), $session, $csrf);
+        self::assertSame(303, $response->status());
+        self::assertSame('/admin?section=images', $response->headers()['Location']);
+    }
+
+    public function testImageRemoveWithoutAuthenticationIsBlocked(): void
+    {
+        $response = $this->dispatch($this->request('POST', '/admin/images/remove'));
+        self::assertSame(303, $response->status());
+        self::assertSame('/admin/login', $response->headers()['Location']);
+    }
+
+    public function testImageRemoveWithInvalidCsrfIsBlocked(): void
+    {
+        $this->authenticateSession();
+        $response = $this->dispatch($this->request('POST', '/admin/images/remove', ['_token' => 'invalid', 'group_id' => 'product-79']));
+        self::assertSame(403, $response->status());
+    }
+
+    public function testImageRemoveWithInvalidGroupIsRejectedServerSide(): void
+    {
+        $this->authenticateSession();
+        $session = new Session(false);
+        $csrf = new Csrf($session);
+        $response = $this->dispatch($this->request('POST', '/admin/images/remove', ['_token' => $csrf->token(), 'group_id' => 'product-999']), $session, $csrf);
+        self::assertSame(303, $response->status());
+        self::assertSame('/admin?section=images', $response->headers()['Location']);
+    }
     public function testLogoutRemovesAdminSession(): void
     {
         $this->authenticateSession();
@@ -117,6 +169,7 @@ final class AdminRouteTest extends TestCase
         }, ['fallback_image' => '/fallback.jpg']);
         $businessHours = new BusinessHoursService(require $root . '/config/business.php');
         $logger = new Logger(sys_get_temp_dir() . '/vitrine-admin-route-test-logs');
+        $productImages = new ProductImageService(new AdminRouteImageRepository(), new StorefrontProductGroupingService(), new ProductImageProcessor(), new ProductImageStorage(sys_get_temp_dir() . '/vitrine-admin-route-public'), ['fallback_image' => '/fallback.jpg']);
         $app = [
             'request' => $request,
             'view' => new View($root . '/resources/views'),
@@ -124,6 +177,7 @@ final class AdminRouteTest extends TestCase
             'session' => $session,
             'adminAuth' => $auth,
             'storefrontVisibility' => $visibility,
+            'productImages' => $productImages,
             'catalog' => $catalog,
             'businessHours' => $businessHours,
             'whatsappCheckout' => new WhatsAppCheckoutService($businessHours, $catalog, ['number' => '5527998586163'], $logger),
@@ -151,4 +205,13 @@ final class AdminRouteAuthRepository implements AdminAuthRepositoryInterface
             ? ['id' => 7, 'username' => 'manager', 'password_hash' => password_hash('correct-password', PASSWORD_DEFAULT)]
             : null;
     }
+}
+final class AdminRouteImageRepository implements StorefrontProductImageRepositoryInterface
+{
+    public function administrativeProducts(): array { return []; }
+    public function findById(int $imageId): ?array { return null; }
+    public function productIdsForImage(int $imageId): array { return []; }
+    public function replaceGroupImage(array $metadata, array $productIds): array { return ['image_id' => 1, 'previous_images' => []]; }
+    public function removeGroupAssociations(array $productIds): array { return []; }
+    public function deleteImageIfUnlinked(int $imageId): bool { return true; }
 }

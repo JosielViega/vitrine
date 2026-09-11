@@ -11,11 +11,16 @@ use App\Core\Router;
 use App\Core\Session;
 use App\Core\View;
 use App\Repositories\AdminAuthRepository;
+use App\Repositories\StorefrontProductImageRepository;
 use App\Repositories\StorefrontProductRepository;
 use App\Repositories\StorefrontVisibilityRepository;
 use App\Services\AdminAuthService;
 use App\Services\BusinessHoursService;
+use App\Services\ProductImageProcessor;
+use App\Services\ProductImageService;
+use App\Services\ProductImageStorage;
 use App\Services\StorefrontCatalogService;
+use App\Services\StorefrontProductGroupingService;
 use App\Services\StorefrontVisibilityService;
 use App\Services\WhatsAppCheckoutService;
 use App\Validation\Validator;
@@ -47,7 +52,16 @@ $csrf = new Csrf($session);
 $database = new Database($databaseConfig);
 $adminAuth = new AdminAuthService(new AdminAuthRepository($database), $session);
 $storefrontVisibility = new StorefrontVisibilityService(new StorefrontVisibilityRepository($database));
-$catalog = new StorefrontCatalogService(new StorefrontProductRepository($database), require $root . '/config/storefront.php');
+$storefrontPresentation = require $root . '/config/storefront.php';
+$productGrouping = new StorefrontProductGroupingService((array) ($storefrontPresentation['variant_aliases'] ?? []));
+$catalog = new StorefrontCatalogService(new StorefrontProductRepository($database), $storefrontPresentation, $productGrouping);
+$productImages = new ProductImageService(
+    new StorefrontProductImageRepository($database),
+    $productGrouping,
+    new ProductImageProcessor(),
+    new ProductImageStorage($root . '/public'),
+    $storefrontPresentation,
+);
 $businessHours = new BusinessHoursService($businessConfig);
 $whatsappCheckout = new WhatsAppCheckoutService($businessHours, $catalog, $whatsappConfig, $logger);
 
@@ -56,6 +70,7 @@ return [
     'catalog' => $catalog,
     'adminAuth' => $adminAuth,
     'storefrontVisibility' => $storefrontVisibility,
+    'productImages' => $productImages,
     'businessHours' => $businessHours,
     'whatsappCheckout' => $whatsappCheckout,
     'request' => Request::capture(),

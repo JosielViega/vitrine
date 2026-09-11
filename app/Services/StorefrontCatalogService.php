@@ -11,11 +11,14 @@ final class StorefrontCatalogService
     private ?array $cachedCatalog = null;
     /** @var null|array<int, array{product: array<string, mixed>, variant: array<string, mixed>}> */
     private ?array $variantIndex = null;
+    private readonly StorefrontProductGroupingService $grouping;
 
     public function __construct(
         private readonly StorefrontCatalogRepository $repository,
         private readonly array $presentation,
+        ?StorefrontProductGroupingService $grouping = null,
     ) {
+        $this->grouping = $grouping ?? new StorefrontProductGroupingService((array) ($presentation['variant_aliases'] ?? []));
     }
 
     /** @return array{categories: list<array<string, mixed>>, subcategories: list<array<string, mixed>>, products: list<array<string, mixed>>} */
@@ -122,7 +125,7 @@ final class StorefrontCatalogService
                 continue;
             }
             $id = (int) $category['id'];
-            $slug = $this->slug((string) $category['name']) ?: 'categoria-' . $id;
+            $slug = $this->grouping->slug((string) $category['name']) ?: 'categoria-' . $id;
             $entry = ['id' => $id, 'slug' => $slug, 'name' => (string) $category['name'], 'sort_order' => (int) $category['sort_order']];
             $categoryById[$id] = $entry;
             $publicCategories[] = $entry;
@@ -136,54 +139,35 @@ final class StorefrontCatalogService
                 continue;
             }
             $id = (int) $subcategory['id'];
-            $entry = ['id' => $id, 'category_id' => $categoryId, 'slug' => $this->slug((string) $subcategory['name']) ?: 'subcategoria-' . $id, 'name' => (string) $subcategory['name'], 'sort_order' => (int) $subcategory['sort_order']];
+            $entry = ['id' => $id, 'category_id' => $categoryId, 'slug' => $this->grouping->slug((string) $subcategory['name']) ?: 'subcategoria-' . $id, 'name' => (string) $subcategory['name'], 'sort_order' => (int) $subcategory['sort_order']];
             $subcategoryById[$id] = $entry;
             $publicSubcategories[] = $entry;
         }
 
-        $rowsBySubcategory = [];
+        $publishableRows = [];
         foreach ($rows as $row) {
             $subcategoryId = (int) $row['subcategory_id'];
             $categoryId = (int) $row['category_id'];
             if ((int) ($row['active'] ?? 1) !== 1 || !isset($subcategoryById[$subcategoryId], $categoryById[$categoryId])) {
                 continue;
             }
-            $rowsBySubcategory[$subcategoryId][] = $row;
+            $publishableRows[] = $row;
         }
 
         $products = [];
-        foreach ($rowsBySubcategory as $subcategoryId => $subcategoryRows) {
-            $halves = [];
-            foreach ($subcategoryRows as $row) {
-                $baseName = $this->halfBaseName((string) $row['name']);
-                if ($baseName !== null) {
-                    $halves[$this->halfMatchSlug($baseName)][] = $row;
-                }
-            }
-            $consumed = [];
-            foreach ($subcategoryRows as $row) {
-                $productId = (int) $row['id'];
-                if (isset($consumed[$productId]) || $this->halfBaseName((string) $row['name']) !== null) {
-                    continue;
-                }
-                $baseName = trim((string) $row['name']);
-                $matchingHalf = $halves[$this->slug($baseName)][0] ?? null;
-                $variants = [$this->variant($row, $matchingHalf === null ? '' : 'Inteira')];
-                if ($matchingHalf !== null) {
-                    $variants[] = $this->variant($matchingHalf, 'Meia');
-                    $consumed[(int) $matchingHalf['id']] = true;
-                }
-                $products[] = $this->product($row, $baseName, $variants, $categoryById, $subcategoryById, $matchingHalf);
-                $consumed[$productId] = true;
-            }
-            foreach ($subcategoryRows as $row) {
-                $productId = (int) $row['id'];
-                $baseName = $this->halfBaseName((string) $row['name']);
-                if ($baseName === null || isset($consumed[$productId])) {
-                    continue;
-                }
-                $products[] = $this->product($row, $baseName, [$this->variant($row, 'Meia')], $categoryById, $subcategoryById);
-            }
+        foreach ($this->grouping->group($publishableRows) as $group) {
+            $variants = array_map(
+                fn (array $variant): array => $this->variant($variant['row'], $variant['label']),
+                $group['variants'],
+            );
+            $products[] = $this->product(
+                $group['primary_row'],
+                $group['name'],
+                $variants,
+                $categoryById,
+                $subcategoryById,
+                $group['secondary_row'],
+            );
         }
 
         $slugCounts = array_count_values(array_column($products, 'id'));
@@ -207,7 +191,7 @@ final class StorefrontCatalogService
         $category = $categories[(int) $row['category_id']];
         $subcategory = $subcategories[(int) $row['subcategory_id']];
 
-        return ['id' => $this->slug($name) ?: 'produto-' . (int) $row['id'], 'name' => $name, 'category' => $category['slug'], 'category_id' => $category['id'], 'category_name' => $category['name'], 'subcategory_id' => $subcategory['id'], 'subcategory' => $subcategory, 'kinds' => array_values(array_unique(array_column($variants, 'kind'))), 'variants' => $variants, 'managed_image' => $this->managedImage($row, $secondaryImageRow)];
+        return ['id' => $this->grouping->slug($name) ?: 'produto-' . (int) $row['id'], 'name' => $name, 'category' => $category['slug'], 'category_id' => $category['id'], 'category_name' => $category['name'], 'subcategory_id' => $subcategory['id'], 'subcategory' => $subcategory, 'kinds' => array_values(array_unique(array_column($variants, 'kind'))), 'variants' => $variants, 'managed_image' => $this->managedImage($row, $secondaryImageRow)];
     }
 
     private function managedImage(array $preferredRow, ?array $secondaryRow): ?string
@@ -225,41 +209,6 @@ final class StorefrontCatalogService
     private function variant(array $row, string $label): array
     {
         return ['product_id' => (int) $row['id'], 'label' => $label, 'price_cents' => (int) $row['price_cents'], 'kind' => (string) $row['kind']];
-    }
-
-    private function halfBaseName(string $name): ?string
-    {
-        foreach (['/^\s*meia\s*:\s*(?<base>.+?)\s*$/iu', '/^(?<base>.+?)\s+-\s*meia\s*$/iu'] as $pattern) {
-            if (preg_match($pattern, $name, $matches) === 1 && trim($matches['base']) !== '') {
-                return trim($matches['base']);
-            }
-        }
-
-        return null;
-    }
-
-    private function halfMatchSlug(string $baseName): string
-    {
-        $slug = $this->slug($baseName);
-        $aliases = (array) ($this->presentation['variant_aliases'] ?? []);
-
-        return $this->slug((string) ($aliases[$slug] ?? $slug));
-    }
-
-    private function slug(string $value): string
-    {
-        $normalized = strtr(trim($value), [
-            'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a',
-            'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e', 'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i',
-            'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o', 'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u', 'ç' => 'c',
-            'Á' => 'A', 'À' => 'A', 'Â' => 'A', 'Ã' => 'A', 'Ä' => 'A',
-            'É' => 'E', 'È' => 'E', 'Ê' => 'E', 'Ë' => 'E', 'Í' => 'I', 'Ì' => 'I', 'Î' => 'I', 'Ï' => 'I',
-            'Ó' => 'O', 'Ò' => 'O', 'Ô' => 'O', 'Õ' => 'O', 'Ö' => 'O', 'Ú' => 'U', 'Ù' => 'U', 'Û' => 'U', 'Ü' => 'U', 'Ç' => 'C',
-        ]);
-        $ascii = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $normalized);
-        $slug = strtolower($ascii === false ? $value : $ascii);
-
-        return trim((string) preg_replace('/[^a-z0-9]+/', '-', $slug), '-');
     }
 
     private function fallbackImage(string $categorySlug): string

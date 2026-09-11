@@ -21,6 +21,18 @@
         });
     }
 
+    document.querySelectorAll('[data-image-file]').forEach((input) => {
+        input.addEventListener('change', () => {
+            const name = input.closest('form')?.querySelector('[data-file-name]');
+            if (name) name.textContent = input.files?.[0]?.name || 'Nenhum arquivo escolhido';
+        });
+    });
+
+    document.querySelectorAll('[data-image-remove]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            if (!window.confirm('Remover a imagem cadastrada deste produto?')) event.preventDefault();
+        });
+    });
     document.querySelectorAll('[data-visibility-form]').forEach((form) => {
         const toggle = form.querySelector('[data-visibility-toggle]');
         if (!toggle) return;

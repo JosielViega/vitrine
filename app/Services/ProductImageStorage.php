@@ -9,7 +9,7 @@ use DateTimeInterface;
 use InvalidArgumentException;
 use RuntimeException;
 
-final class ProductImageStorage
+final class ProductImageStorage implements ProductImageStorageInterface
 {
     private const PUBLIC_PREFIX = '/uploads/products/';
     private const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];

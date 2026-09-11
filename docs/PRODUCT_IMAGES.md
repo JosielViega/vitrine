@@ -48,4 +48,24 @@ O futuro fluxo HTTP deverá:
 
 Esse processamento exigirá GD com suporte a JPEG, PNG e WebP (ou alternativa equivalente confirmada na hospedagem). A ausência de GD não impede a leitura atual da vitrine; somente bloqueará a futura etapa de processamento de uploads até a extensão ser habilitada.
 
-Verificação local em 11/09/2026: xtension_loaded('gd') retornou alse tanto no PHP CLI do host quanto no contêiner lanchonete_web. Portanto, JPEG, PNG e WebP via GD não puderam ser confirmados nesse ambiente e a extensão precisa ser instalada/habilitada antes da Etapa 2. A vitrine atual continua funcionando sem GD.
+## Administração e processamento
+
+A aba `Admin > Imagens` trabalha com o mesmo agrupador usado pelo catálogo público. O identificador enviado pelo formulário aponta apenas para o grupo administrativo; os `product_id` reais são sempre recalculados no servidor. Upload e remoção são rotas `POST`, exigem autenticação administrativa e CSRF válido.
+
+O upload aceita JPEG, PNG e WebP, mas não confia em nome, extensão ou Content-Type do navegador. O backend confirma `UPLOAD_ERR_OK`, mede o arquivo temporário (máximo de 8 MB), detecta o MIME real com Fileinfo, valida a imagem com `getimagesize()` e rejeita dimensões inválidas ou mais de 40.000.000 pixels. A imagem é decodificada por GD, orientada pelo EXIF quando a extensão estiver disponível, reduzida proporcionalmente para até 1600 px no maior lado e re-encodada como WebP qualidade 82. Imagens menores não são ampliadas e transparência é preservada quando possível. Como o original nunca é copiado, metadados como EXIF/GPS não chegam ao arquivo final.
+
+A escrita usa um arquivo temporário controlado no diretório final e `rename` antes da transação de associação. Em falha do banco, o novo arquivo é removido e a imagem anterior permanece. Na troca ou remoção, a imagem antiga só é apagada depois do commit e apenas quando não houver nenhum vínculo restante.
+
+### Checklist da HostGator antes de habilitar uploads
+
+- GD habilitado com JPEG, PNG e WebP;
+- Fileinfo habilitado;
+- EXIF recomendado para corrigir orientação de JPEGs de celular;
+- `upload_max_filesize >= 10M` (mínimo funcional de 8 MB);
+- `post_max_size >= 12M` e sempre maior que o limite do arquivo;
+- `memory_limit` dimensionado para decodificação segura (recomendado pelo menos 256M);
+- permissão de escrita mínima compatível em `public/uploads/products` (diretórios 0775, sem 0777);
+- regras anti-execução de `deploy/hostgator/server-config-examples/uploads-security.rules.example` mescladas manualmente no servidor;
+- confirmar que `public/uploads/` permanece fora do mirror de atualização.
+
+Verificação local em 11/09/2026: GD está habilitado no PHP CLI com suporte a JPEG, PNG e WebP. A DLL de Fileinfo existe, mas não está habilitada no `php.ini`; os testes de codec foram executados habilitando-a somente no processo. EXIF não está disponível. Os limites observados foram `upload_max_filesize=2M`, `post_max_size=8M` e `memory_limit=128M`, portanto a interface alerta que os dois primeiros precisam ser ampliados para oferecer uploads de até 8 MB. Nenhum `php.ini` foi alterado ou versionado.
