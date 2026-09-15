@@ -303,3 +303,11 @@ svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; s
     html { scroll-behavior: auto; }
     *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+.notice-body { min-height: 100vh; background: radial-gradient(circle at top, #382012 0, #0b0806 55%); color: #f7efe7; }
+.public-notice { align-items: center; display: flex; flex-direction: column; justify-content: center; min-height: 100vh; padding: 28px 20px; text-align: center; }
+.public-notice-logo { border-radius: 50%; box-shadow: 0 25px 70px rgba(0,0,0,.48); height: auto; margin-bottom: -42px; position: relative; width: min(190px, 55vw); z-index: 1; }
+.public-notice-card { background: rgba(25,19,15,.97); border: 1px solid #5a3e29; border-radius: 24px; box-shadow: 0 30px 100px rgba(0,0,0,.45); max-width: 680px; padding: 70px clamp(24px, 7vw, 58px) 38px; width: 100%; }
+.public-notice-eyebrow { color: #e9a23b; font-size: .75rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.public-notice h1 { font-family: Georgia, serif; font-size: clamp(2rem, 7vw, 3.4rem); line-height: 1.05; margin: 12px 0 18px; }
+.public-notice p { color: #d7c7b9; font-size: clamp(1rem, 3vw, 1.16rem); line-height: 1.7; margin: 0; white-space: pre-line; }

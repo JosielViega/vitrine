@@ -36,6 +36,7 @@
         "migrate": "@php bin/migrate.php",
         "storefront:visibility-schema": "@php bin/apply-storefront-visibility.php",
         "storefront:images-schema": "@php bin/apply-storefront-images-schema.php",
+        "storefront:operations-schema": "@php bin/apply-storefront-operations-schema.php",
         "lint": "@php bin/lint.php",
         "test": "@php vendor/bin/phpunit",
         "check": [

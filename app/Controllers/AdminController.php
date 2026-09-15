@@ -14,11 +14,13 @@ use App\Services\AdminAuthService;
 use App\Services\ProductImageException;
 use App\Services\ProductImageService;
 use App\Services\StorefrontVisibilityService;
+use App\Services\StorefrontOperationsService;
+use App\Services\StorefrontOperationsValidationException;
 use Throwable;
 
 final class AdminController
 {
-    private const SECTIONS = ['categories', 'subcategories', 'products', 'images'];
+    private const SECTIONS = ['categories', 'subcategories', 'products', 'images', 'operations'];
     private const TYPES = ['category', 'subcategory', 'product'];
 
     public function __construct(
@@ -30,6 +32,7 @@ final class AdminController
         private readonly StorefrontVisibilityService $visibility,
         private readonly ProductImageService $productImages,
         private readonly Logger $logger,
+        private readonly ?StorefrontOperationsService $operations = null,
     ) {
     }
 
@@ -42,6 +45,9 @@ final class AdminController
         $section = $this->section($this->request->query('section'));
         $dashboard = $this->visibility->dashboard();
         $dashboard['images'] = $this->productImages->groups();
+        if ($this->operations !== null) {
+            $dashboard['operations'] = $this->operations->dashboard();
+        }
 
         return $this->noStore(Response::html($this->view->render('admin/index', [
             'title' => 'Admin da Vitrine',
@@ -134,6 +140,68 @@ final class AdminController
         }
 
         return $this->noStore(Response::redirect('/admin?section=images', 303));
+    }
+
+    public function updateNotice(): Response
+    {
+        if (!$this->auth->check()) {
+            return $this->respondUnauthorized();
+        }
+        if (!$this->csrf->verify($this->request->input('_token'))) {
+            return $this->noStore(Response::html('Acesso negado.', 403));
+        }
+
+        try {
+            if ($this->operations === null) {
+                throw new \RuntimeException('Storefront operations are unavailable.');
+            }
+            $this->operations->updateNotice(
+                $this->request->input('notice_enabled'),
+                $this->request->input('notice_title', ''),
+                $this->request->input('notice_message', ''),
+            );
+            $this->session->flash('success', 'Quadro de aviso atualizado.');
+        } catch (StorefrontOperationsValidationException $exception) {
+            return $this->respondError($exception->getMessage(), 422, 'operations');
+        } catch (Throwable $exception) {
+            $this->logger->error('Unexpected storefront notice update failure.', ['exception' => $exception::class]);
+            return $this->respondError('Não foi possível salvar o aviso.', 500, 'operations');
+        }
+
+        return $this->noStore(Response::redirect('/admin?section=operations', 303));
+    }
+
+    public function updateBusinessHours(): Response
+    {
+        if (!$this->auth->check()) {
+            return $this->respondUnauthorized();
+        }
+        if (!$this->csrf->verify($this->request->input('_token'))) {
+            return $this->noStore(Response::html('Acesso negado.', 403));
+        }
+
+        $input = [];
+        for ($weekday = 1; $weekday <= 7; $weekday++) {
+            foreach (['enabled', 'open', 'close'] as $field) {
+                $key = 'day_' . $weekday . '_' . $field;
+                $input[$key] = $this->request->input($key);
+            }
+        }
+
+        try {
+            if ($this->operations === null) {
+                throw new \RuntimeException('Storefront operations are unavailable.');
+            }
+            $this->operations->updateBusinessHours($input);
+            $this->session->flash('success', 'Horário de funcionamento atualizado.');
+        } catch (StorefrontOperationsValidationException $exception) {
+            return $this->respondError($exception->getMessage(), 422, 'operations');
+        } catch (Throwable $exception) {
+            $this->logger->error('Unexpected storefront business hours update failure.', ['exception' => $exception::class]);
+            return $this->respondError('Não foi possível salvar o horário.', 500, 'operations');
+        }
+
+        return $this->noStore(Response::redirect('/admin?section=operations', 303));
     }
 
     private function respondUnauthorized(): Response

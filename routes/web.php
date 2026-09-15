@@ -10,7 +10,7 @@ use App\Controllers\WhatsAppCheckoutController;
 use App\Core\Request;
 use App\Core\Response;
 
-$home = new HomeController($app['view'], $app['catalog'], $app['businessHours'], $app['csrf']);
+$home = new HomeController($app['view'], $app['catalog'], $app['businessHours'], $app['csrf'], $app['storefrontOperations'] ?? null);
 $whatsappCheckout = new WhatsAppCheckoutController($app['request'], $app['csrf'], $app['whatsappCheckout'], $app['logger']);
 $health = new HealthController();
 $router = $app['router'];
@@ -21,13 +21,15 @@ $router->get('/pedido', [$home, 'order']);
 $router->get('/health', [$health, 'index']);
 if (isset($app['session'], $app['adminAuth'], $app['storefrontVisibility'], $app['productImages'])) {
     $adminAuth = new AdminAuthController($app['request'], $app['view'], $app['csrf'], $app['session'], $app['adminAuth'], $app['logger']);
-    $admin = new AdminController($app['request'], $app['view'], $app['csrf'], $app['session'], $app['adminAuth'], $app['storefrontVisibility'], $app['productImages'], $app['logger']);
+    $admin = new AdminController($app['request'], $app['view'], $app['csrf'], $app['session'], $app['adminAuth'], $app['storefrontVisibility'], $app['productImages'], $app['logger'], $app['storefrontOperations'] ?? null);
     $router->get('/admin/login', [$adminAuth, 'loginForm']);
     $router->post('/admin/login', [$adminAuth, 'login']);
     $router->get('/admin', [$admin, 'index']);
     $router->post('/admin/visibility', [$admin, 'updateVisibility']);
     $router->post('/admin/images/upload', [$admin, 'uploadImage']);
     $router->post('/admin/images/remove', [$admin, 'removeImage']);
+    $router->post('/admin/operations/notice', [$admin, 'updateNotice']);
+    $router->post('/admin/operations/hours', [$admin, 'updateBusinessHours']);
     $router->post('/admin/logout', [$adminAuth, 'logout']);
 }
 $router->post('/checkout/whatsapp', [$whatsappCheckout, 'create']);

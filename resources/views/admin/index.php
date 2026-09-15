@@ -8,7 +8,8 @@ declare(strict_types=1);
 /** @var array $dashboard */
 /** @var array $flashMessages */
 /** @var array $imageWarnings */
-$tabs = ['categories' => 'Categorias', 'subcategories' => 'Subcategorias', 'products' => 'Produtos', 'images' => 'Imagens'];
+$tabs = ['categories' => 'Categorias', 'subcategories' => 'Subcategorias', 'products' => 'Produtos', 'images' => 'Imagens', 'operations' => 'Funcionamento'];
+$isOperations = $section === 'operations';
 ?>
 <header class="admin-header">
     <div class="admin-header-inner">
@@ -29,9 +30,9 @@ $tabs = ['categories' => 'Categorias', 'subcategories' => 'Subcategorias', 'prod
 <main class="admin-main">
     <div class="page-heading">
         <div>
-            <span class="eyebrow">Controle de publicação</span>
-            <h1>Visibilidade da vitrine</h1>
-            <p>Escolha o que aparece no cardápio público. O estado operacional é apenas informativo.</p>
+            <span class="eyebrow"><?= $isOperations ? 'Operação' : 'Controle de publicação' ?></span>
+            <h1><?= $isOperations ? 'Funcionamento da vitrine' : 'Visibilidade da vitrine' ?></h1>
+            <p><?= $isOperations ? 'Gerencie comunicados bloqueantes e o calendário semanal.' : 'Escolha o que aparece no cardápio público. O estado operacional é apenas informativo.' ?></p>
         </div>
     </div>
 
@@ -48,7 +49,7 @@ $tabs = ['categories' => 'Categorias', 'subcategories' => 'Subcategorias', 'prod
         <?php foreach ($tabs as $key => $label): ?>
             <a href="/admin?section=<?= e($key) ?>" class="admin-tab <?= $section === $key ? 'is-active' : '' ?>" <?= $section === $key ? 'aria-current="page"' : '' ?>>
                 <?= e($label) ?>
-                <span><?= count($dashboard[$key]) ?></span>
+                <?php if ($key !== 'operations'): ?><span><?= count($dashboard[$key]) ?></span><?php endif; ?>
             </a>
         <?php endforeach; ?>
     </nav>
@@ -96,7 +97,7 @@ $tabs = ['categories' => 'Categorias', 'subcategories' => 'Subcategorias', 'prod
                 <?php endforeach; ?>
             </div>
         </section>
-    <?php else: ?>
+    <?php elseif ($section === 'images'): ?>
         <section aria-labelledby="images-title">
             <div class="section-heading products-heading"><div><h2 id="images-title">Imagens</h2><p>Uma imagem por produto público, compartilhada entre as variantes.</p></div><label class="product-search"><span class="sr-only">Buscar imagens de produtos</span><input type="search" placeholder="Buscar nome, categoria, variante ou ID" data-product-search></label></div>
             <?php foreach ($imageWarnings as $warning): ?><div class="flash flash-error" role="alert"><?= e($warning) ?></div><?php endforeach; ?>
@@ -134,5 +135,69 @@ $tabs = ['categories' => 'Categorias', 'subcategories' => 'Subcategorias', 'prod
                 <?php endforeach; ?>
             </div>
         </section>
+    <?php else:
+        $operations = $dashboard['operations'];
+        $notice = $operations['notice'];
+        $businessStatus = $operations['business_status'];
+    ?>
+        <div class="operations-stack">
+            <section class="operations-card storefront-state <?= $notice['enabled'] ? 'is-blocked' : 'is-available' ?>" aria-labelledby="storefront-state-title">
+                <span class="eyebrow" id="storefront-state-title">Estado da vitrine</span>
+                <h2><?= $notice['enabled'] ? 'Vitrine bloqueada por aviso' : 'Vitrine liberada' ?></h2>
+                <?php if ($notice['enabled']): ?>
+                    <blockquote>“<?= e($notice['title']) ?>”</blockquote>
+                    <p class="notice-preview-message"><?= e($notice['message']) ?></p>
+                <?php else: ?>
+                    <strong class="business-now"><?= e($businessStatus['status_label']) ?></strong>
+                    <p><?= e($businessStatus['message']) ?></p>
+                <?php endif; ?>
+            </section>
+
+            <section class="operations-card" aria-labelledby="notice-settings-title">
+                <div class="section-heading">
+                    <div><span class="eyebrow">Quadro de aviso</span><h2 id="notice-settings-title">Comunicado público bloqueante</h2></div>
+                </div>
+                <form class="operations-form" method="post" action="/admin/operations/notice">
+                    <input type="hidden" name="_token" value="<?= e($csrfToken) ?>">
+                    <label class="switch-row operations-switch">
+                        <span><strong>Ativar quadro de aviso</strong><small>Enquanto ativo, substitui integralmente as páginas públicas.</small></span>
+                        <span class="switch"><input type="checkbox" name="notice_enabled" value="1" <?= $notice['enabled'] ? 'checked' : '' ?>><span class="switch-track"></span></span>
+                    </label>
+                    <label><span>Título</span><input type="text" name="notice_title" maxlength="120" value="<?= e($notice['title']) ?>"></label>
+                    <label><span>Mensagem</span><textarea name="notice_message" maxlength="1500" rows="6"><?= e($notice['message']) ?></textarea></label>
+                    <div class="notice-preview">
+                        <span class="eyebrow">Prévia segura</span>
+                        <strong><?= e($notice['title'] !== '' ? $notice['title'] : 'Título do aviso') ?></strong>
+                        <p><?= e($notice['message'] !== '' ? $notice['message'] : 'Mensagem do aviso') ?></p>
+                    </div>
+                    <button class="button button-primary" type="submit">Salvar aviso</button>
+                </form>
+            </section>
+
+            <section class="operations-card" aria-labelledby="hours-settings-title">
+                <div class="section-heading">
+                    <div><span class="eyebrow">Calendário semanal</span><h2 id="hours-settings-title">Horário de funcionamento</h2><p>Timezone: America/Sao_Paulo</p></div>
+                </div>
+                <form class="operations-form" method="post" action="/admin/operations/hours">
+                    <input type="hidden" name="_token" value="<?= e($csrfToken) ?>">
+                    <div class="hours-grid">
+                        <?php foreach ($operations['schedule'] as $day): ?>
+                            <fieldset class="hours-day" data-hours-day>
+                                <legend><?= e($day['label']) ?></legend>
+                                <label class="switch-row">
+                                    <span>Aberto</span>
+                                    <span class="switch"><input type="checkbox" name="day_<?= (int) $day['weekday'] ?>_enabled" value="1" <?= $day['enabled'] ? 'checked' : '' ?> data-hours-toggle><span class="switch-track"></span></span>
+                                </label>
+                                <div class="hours-fields">
+                                    <label><span>Abertura</span><input type="time" name="day_<?= (int) $day['weekday'] ?>_open" value="<?= e($day['open_time']) ?>" <?= $day['enabled'] ? '' : 'disabled' ?> data-hours-input></label>
+                                    <label><span>Fechamento</span><input type="time" name="day_<?= (int) $day['weekday'] ?>_close" value="<?= e($day['close_time']) ?>" <?= $day['enabled'] ? '' : 'disabled' ?> data-hours-input></label>
+                                </div>
+                            </fieldset>
+                        <?php endforeach; ?>
+                    </div>
+                    <button class="button button-primary" type="submit">Salvar horário</button>
+                </form>
+            </section>
+        </div>
     <?php endif; ?>
 </main>

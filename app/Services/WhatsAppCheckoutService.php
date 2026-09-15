@@ -21,6 +21,7 @@ final class WhatsAppCheckoutService
         private readonly StorefrontCatalogService $catalog,
         array $config,
         private readonly ?Logger $logger = null,
+        private readonly ?StorefrontOperationsService $operations = null,
     ) {
         $digits = preg_replace('/\D+/', '', (string) ($config['number'] ?? '')) ?? '';
         $this->number = preg_match('/^[1-9]\d{9,14}$/', $digits) === 1 ? $digits : null;
@@ -34,6 +35,10 @@ final class WhatsAppCheckoutService
     /** @return array<string, mixed> */
     public function checkout(mixed $cartPayload, mixed $serviceType): array
     {
+        if ($this->operations?->isBlocked() === true) {
+            return $this->error(409, 'storefront_blocked', 'A Vitrine está temporariamente indisponível. Tente novamente mais tarde.');
+        }
+
         $businessStatus = $this->businessHours->currentStatus();
         if (!$businessStatus['is_open']) {
             return $this->error(409, 'business_closed', 'Fechado agora. ' . $businessStatus['message'] . '.');

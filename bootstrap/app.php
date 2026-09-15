@@ -14,6 +14,7 @@ use App\Core\View;
 use App\Repositories\AdminAuthRepository;
 use App\Repositories\StorefrontProductImageRepository;
 use App\Repositories\StorefrontProductRepository;
+use App\Repositories\StorefrontOperationsRepository;
 use App\Repositories\StorefrontVisibilityRepository;
 use App\Services\AdminAuthService;
 use App\Services\BusinessHoursService;
@@ -21,6 +22,7 @@ use App\Services\ProductImageProcessor;
 use App\Services\ProductImageService;
 use App\Services\ProductImageStorage;
 use App\Services\StorefrontCatalogService;
+use App\Services\StorefrontOperationsService;
 use App\Services\StorefrontProductGroupingService;
 use App\Services\StorefrontVisibilityService;
 use App\Services\WhatsAppCheckoutService;
@@ -52,6 +54,10 @@ $csrf = new Csrf($session);
 $database = new Database($databaseConfig);
 $adminAuth = new AdminAuthService(new AdminAuthRepository($database), $session);
 $storefrontVisibility = new StorefrontVisibilityService(new StorefrontVisibilityRepository($database));
+$storefrontOperations = new StorefrontOperationsService(
+    new StorefrontOperationsRepository($database),
+    (string) ($businessConfig['timezone'] ?? 'America/Sao_Paulo'),
+);
 $storefrontPresentation = require $root . '/config/storefront.php';
 $productGrouping = new StorefrontProductGroupingService((array) ($storefrontPresentation['variant_aliases'] ?? []));
 $catalog = new StorefrontCatalogService(new StorefrontProductRepository($database), $storefrontPresentation, $productGrouping);
@@ -62,14 +68,15 @@ $productImages = new ProductImageService(
     new ProductImageStorage($root . '/public'),
     $storefrontPresentation,
 );
-$businessHours = new BusinessHoursService($businessConfig);
-$whatsappCheckout = new WhatsAppCheckoutService($businessHours, $catalog, $whatsappConfig, $logger);
+$businessHours = $storefrontOperations->businessHoursService();
+$whatsappCheckout = new WhatsAppCheckoutService($businessHours, $catalog, $whatsappConfig, $logger, $storefrontOperations);
 
 return [
     'config' => $appConfig,
     'catalog' => $catalog,
     'adminAuth' => $adminAuth,
     'storefrontVisibility' => $storefrontVisibility,
+    'storefrontOperations' => $storefrontOperations,
     'productImages' => $productImages,
     'businessHours' => $businessHours,
     'whatsappCheckout' => $whatsappCheckout,

@@ -149,3 +149,7 @@ Instale as dependências com `composer install --no-dev --classmap-authoritative
 ## Admin da Vitrine
 
 O painel `/admin` usa as mesmas credenciais administrativas armazenadas em `admin_users` no banco compartilhado, mas mantém sessão própria da vitrine. Ele permite alterar somente `storefront_visible` de categorias, subcategorias e produtos; o campo operacional `active` é apenas leitura. Veja `docs/ADMIN.md` para detalhes de segurança e rotas.
+
+## Funcionamento da Vitrine
+
+O quadro de aviso bloqueante e o horário semanal editável ficam em **Admin > Funcionamento**. Antes do primeiro deploy dessa funcionalidade, aplique **composer storefront:operations-schema**. Consulte [docs/STOREFRONT_OPERATIONS.md](docs/STOREFRONT_OPERATIONS.md) para schema, precedência do checkout e procedimento de produção.

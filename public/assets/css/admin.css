@@ -131,3 +131,32 @@ h1 { margin: 6px 0 10px; font-family: Georgia, serif; font-size: clamp(2rem, 5vw
     .item-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
     .status { align-self: flex-start; }
 }
+
+.operations-stack { display: grid; gap: 18px; }
+.operations-card { border: 1px solid var(--border); border-radius: 18px; background: linear-gradient(145deg, rgba(34,26,20,.97), rgba(20,15,12,.97)); padding: clamp(18px, 3vw, 28px); }
+.storefront-state { border-left: 5px solid var(--green); }
+.storefront-state.is-blocked { border-color: var(--red); background: linear-gradient(145deg, rgba(83,18,29,.95), rgba(29,12,14,.98)); box-shadow: 0 20px 60px rgba(226,31,63,.12); }
+.storefront-state h2 { font-size: clamp(1.5rem, 4vw, 2.15rem); margin: 8px 0 10px; }
+.storefront-state blockquote { border-left: 3px solid var(--gold); font-family: Georgia, serif; font-size: 1.25rem; margin: 18px 0 10px; padding-left: 14px; }
+.business-now { color: var(--green); display: block; font-size: 1.08rem; margin-bottom: 4px; }
+.notice-preview-message, .notice-preview p { white-space: pre-line; }
+.operations-form { display: grid; gap: 18px; }
+.operations-form > label:not(.switch-row), .hours-fields label { color: var(--muted); display: grid; font-size: .82rem; font-weight: 700; gap: 7px; }
+.operations-form input[type="text"], .operations-form input[type="time"], .operations-form textarea { background: #100c0a; border: 1px solid var(--border); border-radius: 11px; color: var(--text); font: inherit; outline: none; padding: 12px 14px; width: 100%; }
+.operations-form textarea { min-height: 130px; resize: vertical; }
+.operations-form input:focus, .operations-form textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(233,162,59,.12); }
+.operations-switch { border-bottom: 1px solid var(--border); padding-bottom: 18px; }
+.operations-switch > span:first-child { display: grid; gap: 4px; }
+.operations-switch small { color: var(--muted); font-weight: 400; }
+.notice-preview { background: #100c0a; border: 1px dashed #5a4637; border-radius: 13px; display: grid; gap: 7px; padding: 16px; }
+.notice-preview p { color: var(--muted); margin: 0; }
+.hours-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.hours-day { border: 1px solid var(--border); border-radius: 14px; margin: 0; min-width: 0; padding: 15px; }
+.hours-day legend { color: var(--gold); font-weight: 800; padding: 0 7px; }
+.hours-day .switch-row { border-bottom: 1px solid var(--border); margin-bottom: 13px; padding-bottom: 12px; }
+.hours-fields { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.hours-fields input:disabled { cursor: not-allowed; opacity: .45; }
+@media (max-width: 640px) {
+    .hours-grid, .hours-fields { grid-template-columns: 1fr; }
+    .operations-card { padding: 17px; }
+}

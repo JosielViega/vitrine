@@ -11,8 +11,10 @@ use App\Core\Request;
 use App\Core\Router;
 use App\Core\View;
 use App\Repositories\StorefrontCatalogRepository;
+use App\Repositories\StorefrontOperationsRepositoryInterface;
 use App\Services\BusinessHoursService;
 use App\Services\StorefrontCatalogService;
+use App\Services\StorefrontOperationsService;
 use App\Services\WhatsAppCheckoutService;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -76,6 +78,26 @@ final class StorefrontTest extends TestCase
         self::assertStringContainsString('Abrimos sexta-feira às 17h', $order->body());
     }
 
+    public function testActiveNoticeReplacesEveryRequiredPublicPageButNotHealth(): void
+    {
+        $router = $this->routerAt('2026-09-10 18:00:00', true);
+
+        foreach (['/', '/cardapio', '/produto/qualquer-slug', '/pedido'] as $path) {
+            $response = $this->dispatch($router, 'GET', $path);
+            self::assertSame(200, $response->status());
+            self::assertStringContainsString('Não abriremos', $response->body());
+            self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $response->body());
+            self::assertStringNotContainsString('<script>alert(1)</script>', $response->body());
+            self::assertStringNotContainsString('bottom-nav', $response->body());
+            self::assertStringNotContainsString('Adicionar ao pedido', $response->body());
+            self::assertStringNotContainsString('app.js', $response->body());
+            self::assertStringContainsString('no-store', $response->headers()['Cache-Control']);
+        }
+
+        self::assertSame(200, $this->dispatch($router, 'GET', '/health')->status());
+        self::assertSame('{"status":"ok"}', $this->dispatch($router, 'GET', '/health')->body());
+    }
+
     public function testVersionedCartContractUsesServerBusinessStatus(): void
     {
         $javascript = file_get_contents(dirname(__DIR__) . '/public/assets/js/app.js');
@@ -108,7 +130,7 @@ final class StorefrontTest extends TestCase
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
     }
 
-    private function routerAt(string $dateTime): Router
+    private function routerAt(string $dateTime, bool $blocked = false): Router
     {
         $root = dirname(__DIR__);
         $now = new DateTimeImmutable($dateTime, new DateTimeZone('America/Sao_Paulo'));
@@ -117,8 +139,31 @@ final class StorefrontTest extends TestCase
         $csrf = new Csrf($session);
         $catalog = $this->catalog();
         $logger = new Logger(sys_get_temp_dir() . '/vitrine-test-logs');
-        $checkout = new WhatsAppCheckoutService($businessHours, $catalog, ['number' => '5527998586163']);
-        $app = ['view' => new View($root . '/resources/views'), 'catalog' => $catalog, 'businessHours' => $businessHours, 'whatsappCheckout' => $checkout, 'request' => new Request(), 'csrf' => $csrf, 'logger' => $logger, 'router' => new Router()];
+        $operationsRepository = new class($blocked) implements StorefrontOperationsRepositoryInterface {
+            public function __construct(private bool $blocked) {}
+            public function settings(): array
+            {
+                return [
+                    'notice_enabled' => $this->blocked ? 1 : 0,
+                    'notice_title' => 'Não abriremos',
+                    'notice_message' => '<script>alert(1)</script>',
+                ];
+            }
+            public function businessHours(): array
+            {
+                $rows = [];
+                for ($day = 1; $day <= 7; $day++) {
+                    $enabled = in_array($day, [4, 5, 6], true);
+                    $rows[] = ['weekday' => $day, 'enabled' => $enabled ? 1 : 0, 'open_time' => $enabled ? '17:00:00' : null, 'close_time' => $enabled ? '21:30:00' : null];
+                }
+                return $rows;
+            }
+            public function updateNotice(bool $enabled, string $title, string $message): void {}
+            public function updateBusinessHours(array $schedule): void {}
+        };
+        $operations = new StorefrontOperationsService($operationsRepository);
+        $checkout = new WhatsAppCheckoutService($businessHours, $catalog, ['number' => '5527998586163'], null, $operations);
+        $app = ['view' => new View($root . '/resources/views'), 'catalog' => $catalog, 'businessHours' => $businessHours, 'storefrontOperations' => $operations, 'whatsappCheckout' => $checkout, 'request' => new Request(), 'csrf' => $csrf, 'logger' => $logger, 'router' => new Router()];
 
         return require $root . '/routes/web.php';
     }

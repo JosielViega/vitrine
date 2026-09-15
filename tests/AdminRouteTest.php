@@ -13,12 +13,14 @@ use App\Core\View;
 use App\Repositories\AdminAuthRepositoryInterface;
 use App\Repositories\StorefrontCatalogRepository;
 use App\Repositories\StorefrontProductImageRepositoryInterface;
+use App\Repositories\StorefrontOperationsRepositoryInterface;
 use App\Services\AdminAuthService;
 use App\Services\BusinessHoursService;
 use App\Services\ProductImageProcessor;
 use App\Services\ProductImageService;
 use App\Services\ProductImageStorage;
 use App\Services\StorefrontCatalogService;
+use App\Services\StorefrontOperationsService;
 use App\Services\StorefrontProductGroupingService;
 use App\Services\StorefrontVisibilityService;
 use App\Services\WhatsAppCheckoutService;
@@ -136,6 +138,59 @@ final class AdminRouteTest extends TestCase
         self::assertSame(303, $response->status());
         self::assertSame('/admin?section=images', $response->headers()['Location']);
     }
+    public function testOperationsTabRendersWithoutNumericCounterAndEscapesPreview(): void
+    {
+        $this->authenticateSession();
+        $request = new Request(queryParams: ['section' => 'operations'], server: ['REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/admin?section=operations']);
+        $response = $this->dispatch($request);
+
+        self::assertSame(200, $response->status());
+        self::assertStringContainsString('Funcionamento da vitrine', $response->body());
+        self::assertStringContainsString('Horário de funcionamento', $response->body());
+        self::assertStringContainsString('America/Sao_Paulo', $response->body());
+        self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $response->body());
+        self::assertStringNotContainsString('<script>alert(1)</script>', $response->body());
+        self::assertStringNotContainsString('Funcionamento <span>', $response->body());
+    }
+
+    public function testOperationsPostsRequireAuthenticationAndCsrf(): void
+    {
+        $unauthenticated = $this->dispatch($this->request('POST', '/admin/operations/notice'));
+        self::assertSame(303, $unauthenticated->status());
+        self::assertSame('/admin/login', $unauthenticated->headers()['Location']);
+
+        $this->authenticateSession();
+        $invalidCsrf = $this->dispatch($this->request('POST', '/admin/operations/hours', ['_token' => 'invalid']));
+        self::assertSame(403, $invalidCsrf->status());
+        self::assertStringContainsString('no-store', $invalidCsrf->headers()['Cache-Control']);
+    }
+
+    public function testValidNoticeAndHoursUsePrgRedirect(): void
+    {
+        $this->authenticateSession();
+        $session = new Session(false);
+        $csrf = new Csrf($session);
+
+        $notice = $this->dispatch($this->request('POST', '/admin/operations/notice', [
+            '_token' => $csrf->token(),
+            'notice_enabled' => '1',
+            'notice_title' => 'Aviso',
+            'notice_message' => 'Mensagem',
+        ]), $session, $csrf);
+        self::assertSame(303, $notice->status());
+        self::assertSame('/admin?section=operations', $notice->headers()['Location']);
+
+        $body = ['_token' => $csrf->token()];
+        foreach ([4, 5, 6] as $day) {
+            $body['day_' . $day . '_enabled'] = '1';
+            $body['day_' . $day . '_open'] = '17:00';
+            $body['day_' . $day . '_close'] = '21:30';
+        }
+        $hours = $this->dispatch($this->request('POST', '/admin/operations/hours', $body), $session, $csrf);
+        self::assertSame(303, $hours->status());
+        self::assertSame('/admin?section=operations', $hours->headers()['Location']);
+    }
+
     public function testLogoutRemovesAdminSession(): void
     {
         $this->authenticateSession();
@@ -168,6 +223,7 @@ final class AdminRouteTest extends TestCase
             public function activeProducts(): array { return []; }
         }, ['fallback_image' => '/fallback.jpg']);
         $businessHours = new BusinessHoursService(require $root . '/config/business.php');
+        $operations = new StorefrontOperationsService(new AdminRouteOperationsRepository());
         $logger = new Logger(sys_get_temp_dir() . '/vitrine-admin-route-test-logs');
         $productImages = new ProductImageService(new AdminRouteImageRepository(), new StorefrontProductGroupingService(), new ProductImageProcessor(), new ProductImageStorage(sys_get_temp_dir() . '/vitrine-admin-route-public'), ['fallback_image' => '/fallback.jpg']);
         $app = [
@@ -180,7 +236,8 @@ final class AdminRouteTest extends TestCase
             'productImages' => $productImages,
             'catalog' => $catalog,
             'businessHours' => $businessHours,
-            'whatsappCheckout' => new WhatsAppCheckoutService($businessHours, $catalog, ['number' => '5527998586163'], $logger),
+            'storefrontOperations' => $operations,
+            'whatsappCheckout' => new WhatsAppCheckoutService($businessHours, $catalog, ['number' => '5527998586163'], $logger, $operations),
             'logger' => $logger,
             'router' => new Router(),
         ];
@@ -214,4 +271,25 @@ final class AdminRouteImageRepository implements StorefrontProductImageRepositor
     public function replaceGroupImage(array $metadata, array $productIds): array { return ['image_id' => 1, 'previous_images' => []]; }
     public function removeGroupAssociations(array $productIds): array { return []; }
     public function deleteImageIfUnlinked(int $imageId): bool { return true; }
+}
+final class AdminRouteOperationsRepository implements StorefrontOperationsRepositoryInterface
+{
+    private array $settings = ['notice_enabled' => 0, 'notice_title' => '<script>alert(1)</script>', 'notice_message' => '<b>Mensagem</b>'];
+    private array $hours = [];
+
+    public function __construct()
+    {
+        for ($day = 1; $day <= 7; $day++) {
+            $enabled = in_array($day, [4, 5, 6], true);
+            $this->hours[] = ['weekday' => $day, 'enabled' => $enabled ? 1 : 0, 'open_time' => $enabled ? '17:00:00' : null, 'close_time' => $enabled ? '21:30:00' : null];
+        }
+    }
+
+    public function settings(): array { return $this->settings; }
+    public function businessHours(): array { return $this->hours; }
+    public function updateNotice(bool $enabled, string $title, string $message): void
+    {
+        $this->settings = ['notice_enabled' => $enabled ? 1 : 0, 'notice_title' => $title, 'notice_message' => $message];
+    }
+    public function updateBusinessHours(array $schedule): void {}
 }

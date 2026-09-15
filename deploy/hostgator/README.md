@@ -78,3 +78,7 @@ Não há caminho absoluto de conta embutido no template.
 7. Se houver migrations novas, execute-as em uma etapa separada e planejada.
 
 O mirror representa apenas arquivos que podem ser atualizados. Ele não representa uma lista de arquivos que devem ser apagados do servidor; remoções de código antigo exigem revisão manual.
+
+### Funcionamento da Vitrine
+
+Antes de publicar a versão que contém o controle de funcionamento, siga a ordem documentada em docs/STOREFRONT_OPERATIONS.md: backup, applicator local ao ambiente, conferência do seed, deploy, validação no Admin e smoke tests. Não aplique o schema de produção sem autorização explícita.

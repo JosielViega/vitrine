@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Tests;
 
 use App\Repositories\StorefrontCatalogRepository;
+use App\Repositories\StorefrontOperationsRepositoryInterface;
 use App\Services\BusinessHoursService;
 use App\Services\StorefrontCatalogService;
+use App\Services\StorefrontOperationsService;
 use App\Services\WhatsAppCheckoutService;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -22,6 +24,23 @@ final class WhatsAppCheckoutServiceTest extends TestCase
         self::assertTrue($result['ok']);
         self::assertSame(200, $result['http_status']);
         self::assertStringStartsWith('https://wa.me/5527998586163?text=', $result['whatsapp_url']);
+    }
+
+    public function testActiveNoticeHasPrecedenceAndNeverGeneratesUrl(): void
+    {
+        $result = $this->service('2026-09-10 18:00:00', blocked: true)->checkout([$this->item(82, 7200)], 'pickup');
+
+        self::assertFalse($result['ok']);
+        self::assertSame(409, $result['http_status']);
+        self::assertSame('storefront_blocked', $result['code']);
+        self::assertArrayNotHasKey('whatsapp_url', $result);
+    }
+
+    public function testActiveNoticePrecedesClosedBusiness(): void
+    {
+        $result = $this->service('2026-09-10 21:30:00', blocked: true)->checkout([$this->item(82, 7200)], 'pickup');
+
+        self::assertSame('storefront_blocked', $result['code']);
     }
 
     public function testClosedBusinessNeverGeneratesUrl(): void
@@ -323,12 +342,22 @@ final class WhatsAppCheckoutServiceTest extends TestCase
         string $dateTime = '2026-09-10 18:00:00',
         string $number = '5527998586163',
         ?StorefrontCatalogService $catalog = null,
+        bool $blocked = false,
     ): WhatsAppCheckoutService
     {
         $now = new DateTimeImmutable($dateTime, new DateTimeZone('America/Sao_Paulo'));
         $hours = new BusinessHoursService(require dirname(__DIR__) . '/config/business.php', static fn (): DateTimeImmutable => $now);
 
-        return new WhatsAppCheckoutService($hours, $catalog ?? $this->catalog(), ['number' => $number]);
+        $operationsRepository = new class($blocked) implements StorefrontOperationsRepositoryInterface {
+            public function __construct(private bool $blocked) {}
+            public function settings(): array { return ['notice_enabled' => $this->blocked ? 1 : 0, 'notice_title' => '', 'notice_message' => '']; }
+            public function businessHours(): array { return []; }
+            public function updateNotice(bool $enabled, string $title, string $message): void {}
+            public function updateBusinessHours(array $schedule): void {}
+        };
+        $operations = new StorefrontOperationsService($operationsRepository);
+
+        return new WhatsAppCheckoutService($hours, $catalog ?? $this->catalog(), ['number' => $number], null, $operations);
     }
 
     private function catalog(int $baconActive = 1, int $baconVisible = 1): StorefrontCatalogService

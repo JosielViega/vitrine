@@ -9,6 +9,7 @@ use App\Core\Response;
 use App\Core\View;
 use App\Services\BusinessHoursService;
 use App\Services\StorefrontCatalogService;
+use App\Services\StorefrontOperationsService;
 
 final class HomeController
 {
@@ -17,11 +18,15 @@ final class HomeController
         private readonly StorefrontCatalogService $catalog,
         private readonly BusinessHoursService $businessHours,
         private readonly Csrf $csrf,
+        private readonly ?StorefrontOperationsService $operations = null,
     ) {
     }
 
     public function index(): Response
     {
+        if (($blocked = $this->blockedResponse()) !== null) {
+            return $blocked;
+        }
         $menu = $this->catalog->catalog();
         $featured = $this->catalog->featured();
 
@@ -36,6 +41,9 @@ final class HomeController
 
     public function cardapio(): Response
     {
+        if (($blocked = $this->blockedResponse()) !== null) {
+            return $blocked;
+        }
         return Response::html($this->view->render('pages/menu', [
             'title' => 'Cardápio | Bar e Lanchonete São Jorge',
             'menu' => $this->catalog->catalog(),
@@ -44,6 +52,9 @@ final class HomeController
 
     public function product(string $slug): Response
     {
+        if (($blocked = $this->blockedResponse()) !== null) {
+            return $blocked;
+        }
         $product = $this->catalog->findBySlug(rawurldecode($slug));
         if ($product === null) {
             return Response::html($this->view->render('pages/404', [
@@ -61,10 +72,25 @@ final class HomeController
 
     public function order(): Response
     {
+        if (($blocked = $this->blockedResponse()) !== null) {
+            return $blocked;
+        }
         return Response::html($this->view->render('pages/order', [
             'title' => 'Meu Pedido | Bar e Lanchonete São Jorge',
             'businessStatus' => $this->businessHours->currentStatus(),
             'csrfToken' => $this->csrf->token(),
         ]));
+    }
+
+    private function blockedResponse(): ?Response
+    {
+        if ($this->operations === null || !$this->operations->isBlocked()) {
+            return null;
+        }
+
+        return Response::html($this->view->render('pages/notice', [
+            'title' => 'Aviso | Bar e Lanchonete São Jorge',
+            'notice' => $this->operations->notice(),
+        ], 'layouts/notice'))->withHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 }

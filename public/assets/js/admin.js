@@ -69,4 +69,13 @@
             }
         });
     });
+    document.querySelectorAll('[data-hours-day]').forEach((day) => {
+        const toggle = day.querySelector('[data-hours-toggle]');
+        const inputs = day.querySelectorAll('[data-hours-input]');
+        if (!toggle) return;
+
+        const sync = () => inputs.forEach((input) => { input.disabled = !toggle.checked; });
+        toggle.addEventListener('change', sync);
+        sync();
+    });
 })();
