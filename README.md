@@ -38,6 +38,10 @@ composer check
 
 `composer check` valida o `composer.json`, verifica a sintaxe dos arquivos PHP e executa os testes automatizados.
 
+## Estudar o projeto
+
+O roteiro completo para compreender a arquitetura, seguir os fluxos de ponta a ponta, avaliar evidências e revisar criticamente o código está em [Plano de estudo e revisão completa](docs/PLANO_DE_ESTUDO_E_REVISAO.md).
+
 ## Estado atual
 
 - A vitrine pública responsiva está implementada.
