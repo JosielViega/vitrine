@@ -225,7 +225,7 @@ final class AdminRouteTest extends TestCase
         $businessHours = new BusinessHoursService(require $root . '/config/business.php');
         $operations = new StorefrontOperationsService(new AdminRouteOperationsRepository());
         $logger = new Logger(sys_get_temp_dir() . '/vitrine-admin-route-test-logs');
-        $productImages = new ProductImageService(new AdminRouteImageRepository(), new StorefrontProductGroupingService(), new ProductImageProcessor(), new ProductImageStorage(sys_get_temp_dir() . '/vitrine-admin-route-public'), ['fallback_image' => '/fallback.jpg']);
+        $productImages = new ProductImageService(new AdminRouteImageRepository(), new StorefrontProductGroupingService(), new ProductImageProcessor(), new ProductImageStorage(sys_get_temp_dir() . '/vitrine-admin-route-public'), ['fallback_image' => '/fallback.jpg'], $catalog);
         $app = [
             'request' => $request,
             'view' => new View($root . '/resources/views'),

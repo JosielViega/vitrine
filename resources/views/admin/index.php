@@ -10,6 +10,25 @@ declare(strict_types=1);
 /** @var array $imageWarnings */
 $tabs = ['categories' => 'Categorias', 'subcategories' => 'Subcategorias', 'products' => 'Produtos', 'images' => 'Imagens', 'operations' => 'Funcionamento'];
 $isOperations = $section === 'operations';
+$imageFilters = [];
+if ($section === 'images') {
+    $nameSubcategoryIds = [];
+    foreach ($dashboard['images'] as $imageGroup) {
+        $nameKey = strtolower(trim((string) $imageGroup['subcategory_name']));
+        $nameSubcategoryIds[$nameKey][(int) $imageGroup['subcategory_id']] = true;
+    }
+    foreach ($dashboard['images'] as $imageGroup) {
+        $filterId = (string) $imageGroup['subcategory_id'];
+        if (isset($imageFilters[$filterId])) {
+            continue;
+        }
+        $name = (string) $imageGroup['subcategory_name'];
+        $label = count($nameSubcategoryIds[strtolower(trim($name))] ?? []) > 1
+            ? $imageGroup['category_name'] . ' › ' . $name
+            : $name;
+        $imageFilters[$filterId] = $label;
+    }
+}
 ?>
 <header class="admin-header">
     <div class="admin-header-inner">
@@ -101,16 +120,25 @@ $isOperations = $section === 'operations';
         <section aria-labelledby="images-title">
             <div class="section-heading products-heading"><div><h2 id="images-title">Imagens</h2><p>Uma imagem por produto público, compartilhada entre as variantes.</p></div><label class="product-search"><span class="sr-only">Buscar imagens de produtos</span><input type="search" placeholder="Buscar nome, categoria, variante ou ID" data-product-search></label></div>
             <?php foreach ($imageWarnings as $warning): ?><div class="flash flash-error" role="alert"><?= e($warning) ?></div><?php endforeach; ?>
+            <?php if ($imageFilters !== []): ?>
+                <nav class="image-filters" aria-label="Filtrar imagens por subcategoria" data-image-filters>
+                    <button class="image-filter is-active" type="button" data-image-filter="all" aria-pressed="true">Todas</button>
+                    <?php foreach ($imageFilters as $filterId => $filterLabel): ?>
+                        <button class="image-filter" type="button" data-image-filter="<?= e($filterId) ?>" aria-pressed="false"><?= e($filterLabel) ?></button>
+                    <?php endforeach; ?>
+                </nav>
+            <?php endif; ?>
             <p class="search-empty" data-search-empty hidden>Nenhum produto encontrado.</p>
             <div class="admin-grid image-grid" data-product-list>
                 <?php foreach ($dashboard['images'] as $item):
                     $searchText = implode(' ', [$item['name'], $item['category_name'], $item['subcategory_name'], ...$item['variant_names'], ...array_map(static fn (int $id): string => '#' . $id, $item['product_ids'])]);
                     $hasManagedImage = $item['image_source'] === 'managed';
                 ?>
-                    <article class="admin-card image-card" data-product-card data-search="<?= e($searchText) ?>">
+                    <article class="admin-card image-card" data-product-card data-search="<?= e($searchText) ?>" data-subcategory-id="<?= (int) $item['subcategory_id'] ?>" data-category-id="<?= (int) $item['category_id'] ?>">
                         <div class="item-context"><?= e($item['category_name']) ?> <span>›</span> <?= e($item['subcategory_name']) ?></div>
-                        <div class="item-heading"><div><h3><?= e($item['name']) ?></h3><div class="image-variants"><?= e(implode(' · ', $item['variant_labels'])) ?></div><div class="item-id"><?= e(implode(' · ', array_map(static fn (int $id): string => '#' . $id, $item['product_ids']))) ?></div></div><span class="status <?= $hasManagedImage ? 'status-published' : 'status-inactive' ?>"><?= $hasManagedImage ? 'Cadastrada' : e($item['image_source'] === 'editorial' ? 'Editorial' : 'Padrão') ?></span></div>
-                        <figure class="image-preview"><img src="<?= e($item['image']) ?>" alt="" loading="lazy" decoding="async"></figure>
+                        <?php $imageStatus = $hasManagedImage ? 'Cadastrada' : ($item['image_source'] === 'editorial' ? 'Editorial' : 'Padrão'); $imageStatusClass = $hasManagedImage ? 'status-published' : 'status-inactive'; ?>
+                        <div class="item-heading"><div><h3><?= e($item['name']) ?></h3><div class="image-variants"><?= e(implode(' · ', $item['variant_labels'])) ?></div><div class="item-id"><?= e(implode(' · ', array_map(static fn (int $id): string => '#' . $id, $item['product_ids']))) ?></div></div><span class="status <?= e($imageStatusClass) ?>" data-image-status data-original-label="<?= e($imageStatus) ?>" data-original-class="status <?= e($imageStatusClass) ?>"><?= e($imageStatus) ?></span></div>
+                        <figure class="image-preview"><img src="<?= e($item['image']) ?>" data-image-preview data-original-src="<?= e($item['image']) ?>" alt="" loading="lazy" decoding="async"><span class="image-unsaved" data-image-unsaved hidden>Não salvo</span></figure>
                         <?php if ($hasManagedImage): ?>
                             <p class="image-detail"><strong>Imagem cadastrada</strong><span><?= (int) $item['width'] ?> × <?= (int) $item['height'] ?> · WebP · <?= e(number_format((int) $item['size_bytes'] / 1024, 0, ',', '.')) ?> KB</span></p>
                         <?php else: ?>

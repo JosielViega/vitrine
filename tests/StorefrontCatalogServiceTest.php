@@ -134,6 +134,22 @@ final class StorefrontCatalogServiceTest extends TestCase
         }
     }
 
+    public function testPopularCanProvideFourPublicCandidatesWithCatalogFallback(): void
+    {
+        $service = $this->service([
+            $this->product(1, 'Primeiro', 100),
+            $this->product(2, 'Segundo', 200),
+            $this->product(3, 'Terceiro', 300),
+            $this->product(4, 'Quarto', 400),
+            $this->product(5, 'Quinto', 500),
+        ], presentation: ['popular' => ['terceiro']]);
+
+        $candidates = $service->popular(null, 4);
+
+        self::assertCount(4, $candidates);
+        self::assertSame(['terceiro', 'primeiro', 'segundo', 'quarto'], array_column($candidates, 'id'));
+    }
+
     private function service(array $products, array $subcategories = [], array $presentation = []): StorefrontCatalogService
     {
         $categories = [['id' => 1, 'name' => 'Comidas', 'sort_order' => 0, 'active' => 1]];

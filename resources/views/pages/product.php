@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 /** @var array<string, mixed> $product */
-/** @var list<array<string, mixed>> $related */
 $formatPrice = static fn (int $cents): string => 'R$ ' . number_format($cents / 100, 2, ',', '.');
 $topbarTitle = 'Detalhes do Produto'; $topbarBackHref = '/cardapio#' . $product['category']; $topbarOverlay = false; $activeNav = 'menu';
 ?>
@@ -20,7 +19,6 @@ $topbarTitle = 'Detalhes do Produto'; $topbarBackHref = '/cardapio#' . $product[
             <label class="notes-field">Observações (opcional)<textarea data-notes rows="3" maxlength="180" placeholder="Ex.: sem salada, ponto da fritura, etc."></textarea></label>
             <button class="primary-button" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.2 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.6L20.5 8H6"/></svg>Adicionar ao pedido</button>
         </form>
-        <?php if ($related !== []): ?><section class="related" aria-labelledby="related-title"><div class="section-heading"><h2 id="related-title">Você também pode gostar</h2></div><?php foreach ($related as $item): $originalProduct = $product; $product = $item; require dirname(__DIR__) . '/components/product-list-item.php'; $product = $originalProduct; endforeach; ?></section><?php endif; ?>
     </div>
     <?php require dirname(__DIR__) . '/components/bottom-nav.php'; ?><div class="toast" data-toast role="status" aria-live="polite"></div>
 </div>

@@ -15,12 +15,13 @@ final class ProductImageService
         private readonly ProductImageProcessorInterface $processor,
         private readonly ProductImageStorageInterface $storage,
         private readonly array $presentation,
+        private readonly StorefrontCatalogService $catalog,
     ) {
     }
 
     public function groups(): array
     {
-        return array_map($this->presentGroup(...), $this->grouping->group($this->repository->administrativeProducts()));
+        return array_map($this->presentGroup(...), $this->eligibleGroups());
     }
 
     public function upload(string $groupKey, array $upload): void
@@ -87,7 +88,7 @@ final class ProductImageService
 
     private function resolveGroup(string $groupKey): array
     {
-        foreach ($this->grouping->group($this->repository->administrativeProducts()) as $group) {
+        foreach ($this->eligibleGroups() as $group) {
             if (hash_equals($group['key'], $groupKey)) {
                 return $group;
             }
@@ -115,7 +116,9 @@ final class ProductImageService
             'key' => $group['key'],
             'name' => $group['name'],
             'category_name' => (string) $primary['category_name'],
+            'category_id' => (int) $primary['category_id'],
             'subcategory_name' => (string) $primary['subcategory_name'],
+            'subcategory_id' => (int) $primary['subcategory_id'],
             'product_ids' => array_map(static fn (array $row): int => (int) $row['id'], $rows),
             'variant_labels' => $labels,
             'variant_names' => array_map(static fn (array $row): string => (string) $row['name'], $rows),
@@ -129,6 +132,28 @@ final class ProductImageService
             'active' => count(array_filter($rows, static fn (array $row): bool => (int) $row['active'] === 1)),
             'visible' => count(array_filter($rows, static fn (array $row): bool => (int) $row['storefront_visible'] === 1)),
         ];
+    }
+
+    private function eligibleGroups(): array
+    {
+        $publicProductIds = [];
+        foreach ($this->catalog->catalog()['products'] as $product) {
+            foreach ($product['variants'] as $variant) {
+                $publicProductIds[(int) $variant['product_id']] = true;
+            }
+        }
+
+        return array_values(array_filter(
+            $this->grouping->group($this->repository->administrativeProducts()),
+            static function (array $group) use ($publicProductIds): bool {
+                foreach ($group['variants'] as $variant) {
+                    if (isset($publicProductIds[(int) $variant['row']['id']])) {
+                        return true;
+                    }
+                }
+                return false;
+            },
+        ));
     }
 
     private function managedRow(array $primary, ?array $secondary): ?array

@@ -66,7 +66,6 @@ final class HomeController
         return Response::html($this->view->render('pages/product', [
             'title' => $product['name'] . ' | Bar e Lanchonete São Jorge',
             'product' => $product,
-            'related' => $this->catalog->related($product),
         ]));
     }
 
@@ -79,6 +78,7 @@ final class HomeController
             'title' => 'Meu Pedido | Bar e Lanchonete São Jorge',
             'businessStatus' => $this->businessHours->currentStatus(),
             'csrfToken' => $this->csrf->token(),
+            'recommendations' => $this->catalog->popular(null, 4),
         ]));
     }
 

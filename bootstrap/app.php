@@ -67,6 +67,7 @@ $productImages = new ProductImageService(
     new ProductImageProcessor(),
     new ProductImageStorage($root . '/public'),
     $storefrontPresentation,
+    $catalog,
 );
 $businessHours = $storefrontOperations->businessHoursService();
 $whatsappCheckout = new WhatsAppCheckoutService($businessHours, $catalog, $whatsappConfig, $logger, $storefrontOperations);

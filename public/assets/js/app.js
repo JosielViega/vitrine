@@ -150,10 +150,17 @@ function createQuantityButton(label, symbol, action) {
 function initOrder() {
     const screen = document.querySelector('[data-page="order"]');
     if (!screen) return;
-    const list = screen.querySelector('[data-order-items]'); const empty = screen.querySelector('[data-empty-order]'); const subtotal = screen.querySelector('[data-order-subtotal]'); const total = screen.querySelector('[data-order-total]'); const checkout = screen.querySelector('[data-checkout]'); const checkoutLabel = screen.querySelector('[data-checkout-label]'); const notice = screen.querySelector('[data-checkout-notice]'); const token = screen.querySelector('[data-checkout-token]'); const serviceTypes = [...screen.querySelectorAll('input[name="service_type"]')]; let cart = loadCart(); let businessOpen = screen.dataset.businessOpen === 'true'; let submitting = false;
+    const list = screen.querySelector('[data-order-items]'); const empty = screen.querySelector('[data-empty-order]'); const subtotal = screen.querySelector('[data-order-subtotal]'); const total = screen.querySelector('[data-order-total]'); const checkout = screen.querySelector('[data-checkout]'); const checkoutLabel = screen.querySelector('[data-checkout-label]'); const notice = screen.querySelector('[data-checkout-notice]'); const token = screen.querySelector('[data-checkout-token]'); const serviceTypes = [...screen.querySelectorAll('input[name="service_type"]')]; const recommendations = screen.querySelector('[data-order-recommendations]'); const recommendationCards = [...screen.querySelectorAll('[data-recommendation-card]')]; let cart = loadCart(); let businessOpen = screen.dataset.businessOpen === 'true'; let submitting = false;
     const selectedServiceType = () => serviceTypes.find((option) => option.checked)?.value || '';
     function updateCheckoutState() { checkout.disabled = submitting || !businessOpen || cart.length === 0 || selectedServiceType() === ''; checkout.setAttribute('aria-busy', submitting ? 'true' : 'false'); checkoutLabel.textContent = submitting ? 'Validando pedido...' : 'Finalizar pedido no WhatsApp'; }
     function showCheckoutNotice(message, isError = false) { notice.textContent = message; notice.classList.toggle('is-error', isError); notice.hidden = false; }
+    function renderRecommendations() {
+        if (!recommendations) return;
+        const cartProductIds = new Set(cart.map((item) => item.publicProductId));
+        const eligible = recommendationCards.filter((card) => !cartProductIds.has(card.dataset.publicProductId)).slice(0, 2);
+        recommendationCards.forEach((card) => { card.hidden = !eligible.includes(card); });
+        recommendations.hidden = cart.length === 0 || eligible.length === 0;
+    }
     function render() {
         list.replaceChildren();
         cart.forEach((item) => {
@@ -184,7 +191,7 @@ function initOrder() {
         });
         const valueCents = cart.reduce((sum, item) => sum + (itemUnitPrice(item) * item.quantity), 0);
         subtotal.textContent = currency.format(valueCents / 100); total.textContent = currency.format(valueCents / 100);
-        empty.hidden = cart.length > 0; updateCheckoutState();
+        empty.hidden = cart.length > 0; renderRecommendations(); updateCheckoutState();
     }
     function persistAndRender() { saveCart(cart); render(); }
     function change(key, difference) { const item = cart.find((candidate) => candidate.key === key); if (!item) return; item.quantity += difference; if (item.quantity <= 0) cart = cart.filter((candidate) => candidate.key !== item.key); persistAndRender(); }
@@ -192,13 +199,27 @@ function initOrder() {
     serviceTypes.forEach((option) => option.addEventListener('change', updateCheckoutState));
     checkout.addEventListener('click', async () => {
         if (checkout.disabled) return;
+        const whatsappWindow = window.open('', '_blank');
+        if (!whatsappWindow) {
+            showCheckoutNotice('Permita a abertura de uma nova aba para continuar no WhatsApp.', true);
+            return;
+        }
+        whatsappWindow.opener = null;
         submitting = true; updateCheckoutState(); notice.hidden = true;
+        let checkoutSucceeded = false;
         try {
             const body = new URLSearchParams({ _token: token.value, cart: JSON.stringify(cart), service_type: selectedServiceType() });
             const response = await fetch('/checkout/whatsapp', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'Accept': 'application/json' }, body });
             const result = await response.json();
             if (response.ok && result.ok && typeof result.whatsapp_url === 'string' && result.whatsapp_url.startsWith('https://wa.me/')) {
-                window.location.assign(result.whatsapp_url); return;
+                if (whatsappWindow.closed) throw new Error('WhatsApp window was closed');
+                whatsappWindow.location.replace(result.whatsapp_url);
+                window.localStorage.removeItem(CART_KEY);
+                cart = [];
+                updateCartIndicators(cart);
+                checkoutSucceeded = true;
+                window.location.replace('/');
+                return;
             }
             if (result.code === 'cart_changed' && Array.isArray(result.cart)) {
                 saveCart(result.cart); cart = loadCart(); render();
@@ -208,6 +229,7 @@ function initOrder() {
         } catch {
             showCheckoutNotice('Não foi possível conectar para finalizar. Tente novamente.', true);
         } finally {
+            if (!checkoutSucceeded && !whatsappWindow.closed) whatsappWindow.close();
             submitting = false; updateCheckoutState();
         }
     });

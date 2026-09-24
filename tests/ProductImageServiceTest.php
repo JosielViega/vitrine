@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Repositories\StorefrontCatalogRepository;
 use App\Repositories\StorefrontProductImageRepositoryInterface;
 use App\Services\ProductImageException;
 use App\Services\ProductImageProcessorInterface;
 use App\Services\ProductImageService;
 use App\Services\ProductImageStorageInterface;
+use App\Services\StorefrontCatalogService;
 use App\Services\StorefrontProductGroupingService;
 use DateTimeInterface;
 use PHPUnit\Framework\TestCase;
@@ -29,7 +31,7 @@ final class ProductImageServiceTest extends TestCase
         $this->repository = new ProductImageRepositoryFake([$this->row(79, 'Camarão'), $this->row(82, 'Meia: Camarão')]);
         $this->storage = new ProductImageStorageFake($this->root);
         $this->processor = new ProductImageProcessorFake();
-        $this->service = new ProductImageService($this->repository, new StorefrontProductGroupingService(), $this->processor, $this->storage, ['fallback_image' => '/fallback.jpg']);
+        $this->service = $this->createService();
     }
 
     protected function tearDown(): void
@@ -112,18 +114,79 @@ final class ProductImageServiceTest extends TestCase
         self::assertFileDoesNotExist($this->storage->physicalPath($oldPath));
     }
 
-    public function testHiddenAndInactiveProductsRemainAvailableForImageAdministration(): void
+    public function testGroupWithVisibleWholeAndHiddenHalfRemainsAvailableWithEveryId(): void
     {
-        $this->repository->rows[0]['active'] = 0;
         $this->repository->rows[1]['storefront_visible'] = 0;
-        $this->repository->rows[0]['category_storefront_visible'] = 0;
-        $this->repository->rows[1]['subcategory_storefront_visible'] = 0;
-        $groups = $this->service->groups();
+        $groups = $this->createService()->groups();
 
         self::assertCount(1, $groups);
         self::assertSame([79, 82], $groups[0]['product_ids']);
-        self::assertSame(1, $groups[0]['active']);
         self::assertSame(1, $groups[0]['visible']);
+    }
+
+    public function testGroupWithHiddenWholeAndVisibleHalfRemainsAvailableWithEveryId(): void
+    {
+        $this->repository->rows[0]['storefront_visible'] = 0;
+        $groups = $this->createService()->groups();
+
+        self::assertCount(1, $groups);
+        self::assertSame([79, 82], $groups[0]['product_ids']);
+        self::assertSame(1, $groups[0]['visible']);
+    }
+
+    public function testFullyHiddenGroupIsOmittedAndCannotBeManipulated(): void
+    {
+        $this->repository->rows[0]['storefront_visible'] = 0;
+        $this->repository->rows[1]['storefront_visible'] = 0;
+        $service = $this->createService();
+
+        self::assertSame([], $service->groups());
+        try {
+            $service->upload('product-79', ['error' => UPLOAD_ERR_OK]);
+            self::fail('Expected ineligible upload to be rejected.');
+        } catch (ProductImageException $exception) {
+            self::assertSame('Produto não encontrado.', $exception->getMessage());
+        }
+        $this->expectException(ProductImageException::class);
+        $service->remove('product-79');
+    }
+
+    public function testParentVisibilityAndActivityControlEligibility(): void
+    {
+        foreach (['category_storefront_visible', 'subcategory_storefront_visible', 'category_active', 'subcategory_active'] as $field) {
+            foreach ($this->repository->rows as &$row) $row[$field] = 0;
+            unset($row);
+            self::assertSame([], $this->createService()->groups(), $field);
+            foreach ($this->repository->rows as &$row) $row[$field] = 1;
+            unset($row);
+        }
+        $this->repository->rows[0]['active'] = 0;
+        $this->repository->rows[1]['active'] = 0;
+        self::assertSame([], $this->createService()->groups());
+    }
+
+    public function testConfiguredAddonProductsAreNeverImageGroups(): void
+    {
+        $this->repository->rows = [$this->row(117, 'Bacon'), $this->row(74, 'Mussarela')];
+
+        self::assertSame([], $this->createService()->groups());
+    }
+
+    public function testHidingAndReactivatingGroupPreservesExistingImage(): void
+    {
+        $oldPath = $this->seedOldImage([79, 82]);
+        foreach ($this->repository->rows as &$row) $row['storefront_visible'] = 0;
+        unset($row);
+
+        self::assertSame([], $this->createService()->groups());
+        self::assertSame(10, $this->repository->links[79]);
+        self::assertFileExists($this->storage->physicalPath($oldPath));
+
+        $this->repository->rows[0]['storefront_visible'] = 1;
+        $groups = $this->createService()->groups();
+        self::assertCount(1, $groups);
+        self::assertSame('managed', $groups[0]['image_source']);
+        self::assertSame(10, $groups[0]['image_id']);
     }
 
     public function testUnknownGroupIsRejectedWithoutDatabaseMutation(): void
@@ -142,9 +205,55 @@ final class ProductImageServiceTest extends TestCase
         return $path;
     }
 
+    private function createService(): ProductImageService
+    {
+        $presentation = require dirname(__DIR__) . '/config/storefront.php';
+        $grouping = new StorefrontProductGroupingService((array) ($presentation['variant_aliases'] ?? []));
+        $catalog = new StorefrontCatalogService(new ProductImageCatalogRepositoryFake($this->repository), $presentation, $grouping);
+
+        return new ProductImageService($this->repository, $grouping, $this->processor, $this->storage, $presentation, $catalog);
+    }
+
     private function row(int $id, string $name): array
     {
         return ['id' => $id, 'name' => $name, 'price_cents' => 5000, 'kind' => 'kitchen', 'active' => 1, 'storefront_visible' => 1, 'subcategory_id' => 1, 'subcategory_name' => 'Porções', 'subcategory_active' => 1, 'subcategory_storefront_visible' => 1, 'category_id' => 1, 'category_name' => 'Comidas', 'category_active' => 1, 'category_storefront_visible' => 1];
+    }
+}
+
+final class ProductImageCatalogRepositoryFake implements StorefrontCatalogRepository
+{
+    public function __construct(private readonly ProductImageRepositoryFake $source) {}
+
+    public function activeCategories(): array
+    {
+        $categories = [];
+        foreach ($this->source->rows as $row) {
+            if ((int) $row['category_active'] !== 1 || (int) $row['category_storefront_visible'] !== 1) continue;
+            $categories[(int) $row['category_id']] = ['id' => (int) $row['category_id'], 'name' => $row['category_name'], 'sort_order' => 0, 'active' => 1];
+        }
+        return array_values($categories);
+    }
+
+    public function activeSubcategories(): array
+    {
+        $subcategories = [];
+        foreach ($this->source->rows as $row) {
+            if ((int) $row['category_active'] !== 1 || (int) $row['category_storefront_visible'] !== 1 || (int) $row['subcategory_active'] !== 1 || (int) $row['subcategory_storefront_visible'] !== 1) continue;
+            $subcategories[(int) $row['subcategory_id']] = ['id' => (int) $row['subcategory_id'], 'category_id' => (int) $row['category_id'], 'name' => $row['subcategory_name'], 'sort_order' => 0, 'active' => 1];
+        }
+        return array_values($subcategories);
+    }
+
+    public function activeProducts(): array
+    {
+        return array_values(array_filter($this->source->administrativeProducts(), static fn (array $row): bool =>
+            (int) $row['active'] === 1
+            && (int) $row['storefront_visible'] === 1
+            && (int) $row['subcategory_active'] === 1
+            && (int) $row['subcategory_storefront_visible'] === 1
+            && (int) $row['category_active'] === 1
+            && (int) $row['category_storefront_visible'] === 1
+        ));
     }
 }
 

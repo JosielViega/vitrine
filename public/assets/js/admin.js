@@ -7,25 +7,71 @@
     const search = document.querySelector('[data-product-search]');
     const cards = Array.from(document.querySelectorAll('[data-product-card]'));
     const empty = document.querySelector('[data-search-empty]');
+    const filters = Array.from(document.querySelectorAll('[data-image-filter]'));
+    let activeSubcategory = 'all';
 
-    if (search && cards.length > 0) {
-        search.addEventListener('input', () => {
-            const term = normalize(search.value.trim());
-            let visible = 0;
-            cards.forEach((card) => {
-                const matches = normalize(card.dataset.search || '').includes(term);
-                card.hidden = !matches;
-                visible += matches ? 1 : 0;
-            });
-            if (empty) empty.hidden = visible !== 0;
+    function applyProductFilters() {
+        const term = normalize(search?.value.trim() || '');
+        let visible = 0;
+        cards.forEach((card) => {
+            const matchesSearch = normalize(card.dataset.search || '').includes(term);
+            const matchesSubcategory = activeSubcategory === 'all' || card.dataset.subcategoryId === activeSubcategory;
+            card.hidden = !matchesSearch || !matchesSubcategory;
+            visible += card.hidden ? 0 : 1;
         });
+        if (empty) empty.hidden = visible !== 0;
     }
 
+    if (search) {
+        search.addEventListener('input', applyProductFilters);
+    }
+    filters.forEach((filter) => filter.addEventListener('click', () => {
+        activeSubcategory = filter.dataset.imageFilter || 'all';
+        filters.forEach((candidate) => {
+            const active = candidate === filter;
+            candidate.classList.toggle('is-active', active);
+            candidate.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+        applyProductFilters();
+    }));
+
+    const previewUrls = new Set();
     document.querySelectorAll('[data-image-file]').forEach((input) => {
+        let previewUrl = null;
+        const card = input.closest('[data-product-card]');
+        const image = card?.querySelector('[data-image-preview]');
+        const status = card?.querySelector('[data-image-status]');
+        const unsaved = card?.querySelector('[data-image-unsaved]');
+        const releasePreview = () => {
+            if (!previewUrl) return;
+            URL.revokeObjectURL(previewUrl);
+            previewUrls.delete(previewUrl);
+            previewUrl = null;
+        };
         input.addEventListener('change', () => {
             const name = input.closest('form')?.querySelector('[data-file-name]');
-            if (name) name.textContent = input.files?.[0]?.name || 'Nenhum arquivo escolhido';
+            const file = input.files?.[0];
+            if (name) name.textContent = file?.name || 'Nenhum arquivo escolhido';
+            releasePreview();
+            if (!image || !status || !unsaved) return;
+            if (!file) {
+                image.src = image.dataset.originalSrc || image.src;
+                status.textContent = status.dataset.originalLabel || '';
+                status.className = status.dataset.originalClass || 'status';
+                unsaved.hidden = true;
+                return;
+            }
+            previewUrl = URL.createObjectURL(file);
+            previewUrls.add(previewUrl);
+            image.src = previewUrl;
+            status.textContent = 'Não salvo';
+            status.className = 'status status-unsaved';
+            unsaved.hidden = false;
         });
+    });
+    window.addEventListener('beforeunload', () => {
+        previewUrls.forEach((url) => URL.revokeObjectURL(url));
+        previewUrls.clear();
     });
 
     document.querySelectorAll('[data-image-remove]').forEach((form) => {

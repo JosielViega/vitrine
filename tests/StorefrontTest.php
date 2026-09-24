@@ -48,12 +48,16 @@ final class StorefrontTest extends TestCase
         self::assertStringContainsString('value="10"', $product->body());
         self::assertStringContainsString('value="11"', $product->body());
         self::assertStringContainsString('Adicionar ao pedido', $product->body());
+        self::assertStringNotContainsString('Você também pode gostar', $product->body());
         self::assertSame(200, $order->status());
         self::assertStringContainsString('data-business-open="true"', $order->body());
         self::assertStringContainsString('Pedidos até 21h30', $order->body());
         self::assertStringContainsString('data-checkout-token', $order->body());
         self::assertStringContainsString('value="pickup"', $order->body());
         self::assertStringContainsString('value="dine_in"', $order->body());
+        self::assertStringContainsString('Que tal acrescentar?', $order->body());
+        self::assertStringContainsString('data-recommendation-card', $order->body());
+        self::assertStringContainsString('Ver produto', $order->body());
         self::assertSame('{"status":"ok"}', $health->body());
         self::assertSame(404, $unknown->status());
     }
