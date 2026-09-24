@@ -10,11 +10,19 @@ públicos agrupados:
 - **popular_product_1_slug**, opcional;
 - **popular_product_2_slug**, opcional.
 
-O applicator **composer storefront:home-schema** cria a tabela e insere a linha
-inicial com **featured** e os dois primeiros itens de **popular** de
+Quando o repositório completo estiver disponível no ambiente, o applicator
+**composer storefront:home-schema** cria a tabela e insere a linha inicial com
+**featured** e os dois primeiros itens de **popular** de
 **config/storefront.php**. A cláusula idempotente preserva escolhas já editadas
 no Admin. Esses valores de arquivo passam a ser apenas defaults de primeira
 instalação.
+
+O mirror da HostGator contém somente arquivos de runtime. Ele não inclui
+**bin/apply-storefront-home-schema.php** nem
+**database/patches/004_add_storefront_home_highlights.sql**, e o builder não
+executa migrations ou patches. Portanto, o comando acima não está disponível
+dentro do mirror e a atualização do schema de produção deve ser feita em uma
+etapa separada e consciente.
 
 ## Runtime
 
@@ -40,14 +48,55 @@ compactado para a primeira posição. O preview usa os dados atuais do catálogo
 marca “Não salvo” enquanto a seleção divergir do valor carregado. O salvamento
 usa CSRF e Post/Redirect/Get.
 
-## Ordem de deploy
+## Ordem de deploy na HostGator
+
+Antes de enviar o novo mirror, aplique o schema separadamente no banco de
+produção pelo phpMyAdmin/cPanel:
 
 1. Faça backup do banco e dos arquivos.
-2. Disponibilize e execute **composer storefront:home-schema** no ambiente.
-3. Confirme a linha **id = 1** e os slugs sem alterar escolhas existentes.
-4. Somente depois publique o código que usa a nova tabela.
-5. Abra **Admin > Home** e confira os três slots.
-6. Valide a Home pública, inclusive imagens, preços e produtos ocultos.
+2. No phpMyAdmin, selecione explicitamente o banco de produção correto.
+3. Execute o conteúdo de
+   **database/patches/004_add_storefront_home_highlights.sql**.
+4. Execute o seed idempotente abaixo, que usa exatamente os defaults atuais de
+   **config/storefront.php**:
 
-O applicator deve ser executado conscientemente no ambiente correto. Esta
-documentação não autoriza alterações no banco de produção.
+```sql
+INSERT INTO storefront_home_highlights (
+    id,
+    featured_product_slug,
+    popular_product_1_slug,
+    popular_product_2_slug
+) VALUES (
+    1,
+    'camarao-c-batata-e-aipim',
+    'carne-c-aipim',
+    'batata'
+)
+ON DUPLICATE KEY UPDATE id = id;
+```
+
+5. Confirme a linha sem alterá-la:
+
+```sql
+SELECT
+    id,
+    featured_product_slug,
+    popular_product_1_slug,
+    popular_product_2_slug,
+    updated_at
+FROM storefront_home_highlights
+WHERE id = 1;
+```
+
+6. Somente depois gere, revise e envie o mirror para a HostGator.
+7. Abra **Admin > Home**, confirme os três slots e faça um salvamento de teste
+   apenas se a configuração exibida estiver correta.
+8. Valide a Home pública, inclusive imagens, preços e produtos ocultos.
+
+O seed usa **ON DUPLICATE KEY UPDATE id = id** e nunca sobrescreve uma
+configuração já existente. Em outro ambiente que tenha o repositório completo,
+é possível executar **composer storefront:home-schema** no lugar dos passos 3 e
+4. Esse comando não existe dentro do mirror da HostGator.
+
+O patch ou applicator deve ser executado conscientemente no ambiente correto.
+Esta documentação não autoriza alterações no banco de produção.

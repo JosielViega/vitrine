@@ -85,8 +85,6 @@ Antes de publicar a versão que contém o controle de funcionamento, siga a orde
 
 ### Destaques da Home
 
-O código dos destaques depende da tabela `storefront_home_highlights`. Antes de publicar essa versão, siga `docs/HOME_HIGHLIGHTS.md`: faça backup, disponibilize e execute `composer storefront:home-schema`, confirme o seed da linha `id = 1` e somente depois publique o código. Em seguida, confira `Admin > Home` e a Home pública. Não execute o applicator em produção sem autorização explícita.
+O código dos destaques depende da tabela `storefront_home_highlights`. Antes de enviar o novo mirror, siga `docs/HOME_HIGHLIGHTS.md`: faça backup, aplique pelo phpMyAdmin o conteúdo de `database/patches/004_add_storefront_home_highlights.sql`, execute o seed idempotente documentado e confirme a linha `id = 1`. Somente depois publique o mirror, confira `Admin > Home` e valide a Home pública.
 
-### Destaques da Home
-
-O código dos destaques depende da tabela `storefront_home_highlights`. Antes de publicar essa versão, siga `docs/HOME_HIGHLIGHTS.md`: faça backup, disponibilize e execute `composer storefront:home-schema`, confirme o seed da linha `id = 1` e somente depois publique o código. Em seguida, confira `Admin > Home` e a Home pública. Não execute o applicator em produção sem autorização explícita.
+O mirror contém arquivos de runtime e não inclui o patch nem `bin/apply-storefront-home-schema.php`; o builder também não executa migrations ou patches. Em ambientes onde o repositório completo estiver disponível, pode-se usar `composer storefront:home-schema`, mas esse comando não existe dentro do mirror da HostGator. Não altere o schema de produção sem autorização explícita e backup disponível.
