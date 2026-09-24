@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 return [
+    // Defaults used only to seed storefront_home_highlights on first installation.
     'featured' => 'camarao-c-batata-e-aipim',
     'popular' => ['carne-c-aipim', 'batata'],
     'variant_aliases' => [

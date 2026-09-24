@@ -71,9 +71,8 @@ final class StorefrontCatalogService
     }
 
     /** @return list<array<string, mixed>> */
-    public function popular(?string $excludedSlug = null, int $limit = 2): array
+    public function popular(?string $excludedSlug = null): array
     {
-        $limit = max(0, $limit);
         $products = [];
         foreach ((array) ($this->presentation['popular'] ?? []) as $slug) {
             $product = $this->findBySlug((string) $slug);
@@ -82,7 +81,7 @@ final class StorefrontCatalogService
             }
         }
         foreach ($this->catalog()['products'] as $product) {
-            if (count($products) >= $limit) {
+            if (count($products) >= 2) {
                 break;
             }
             if ($product['id'] !== $excludedSlug) {
@@ -90,7 +89,7 @@ final class StorefrontCatalogService
             }
         }
 
-        return array_slice(array_values($products), 0, $limit);
+        return array_slice(array_values($products), 0, 2);
     }
 
     /** @return list<array<string, mixed>> */

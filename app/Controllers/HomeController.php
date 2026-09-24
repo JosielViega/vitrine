@@ -9,6 +9,7 @@ use App\Core\Response;
 use App\Core\View;
 use App\Services\BusinessHoursService;
 use App\Services\StorefrontCatalogService;
+use App\Services\StorefrontHomeHighlightsService;
 use App\Services\StorefrontOperationsService;
 
 final class HomeController
@@ -16,6 +17,7 @@ final class HomeController
     public function __construct(
         private readonly View $view,
         private readonly StorefrontCatalogService $catalog,
+        private readonly StorefrontHomeHighlightsService $homeHighlights,
         private readonly BusinessHoursService $businessHours,
         private readonly Csrf $csrf,
         private readonly ?StorefrontOperationsService $operations = null,
@@ -28,13 +30,13 @@ final class HomeController
             return $blocked;
         }
         $menu = $this->catalog->catalog();
-        $featured = $this->catalog->featured();
+        $highlights = $this->homeHighlights->highlights();
 
         return Response::html($this->view->render('pages/home', [
             'title' => 'Bar e Lanchonete São Jorge',
             'menu' => $menu,
-            'featured' => $featured,
-            'popular' => $this->catalog->popular($featured['id'] ?? null),
+            'featured' => $highlights['featured'],
+            'popular' => $highlights['popular'],
             'businessStatus' => $this->businessHours->currentStatus(),
         ]));
     }
@@ -78,7 +80,6 @@ final class HomeController
             'title' => 'Meu Pedido | Bar e Lanchonete São Jorge',
             'businessStatus' => $this->businessHours->currentStatus(),
             'csrfToken' => $this->csrf->token(),
-            'recommendations' => $this->catalog->popular(null, 4),
         ]));
     }
 

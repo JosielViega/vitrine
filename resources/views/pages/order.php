@@ -5,9 +5,7 @@ declare(strict_types=1);
 $activeNav = 'order';
 /** @var array<string, mixed> $businessStatus */
 /** @var string $csrfToken */
-/** @var list<array<string, mixed>> $recommendations */
 $isBusinessOpen = (bool) $businessStatus['is_open'];
-$formatPrice = static fn (int $cents): string => 'R$ ' . number_format($cents / 100, 2, ',', '.');
 ?>
 <div class="screen order-screen" data-page="order" data-business-open="<?= $isBusinessOpen ? 'true' : 'false' ?>">
     <header class="topbar">
@@ -21,19 +19,6 @@ $formatPrice = static fn (int $cents): string => 'R$ ' . number_format($cents / 
         <div class="empty-order" data-empty-order hidden><h2>Seu pedido está vazio</h2><p>Escolha uma porção ou bebida no cardápio.</p></div>
         <a class="add-more" href="/cardapio"><span class="round-add"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>Adicionar mais itens<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
         <div class="order-total"><p><span>Subtotal</span><strong data-order-subtotal>R$ 0,00</strong></p><p><span>Total</span><strong data-order-total>R$ 0,00</strong></p></div>
-        <?php if ($recommendations !== []): ?>
-            <section class="order-recommendations" aria-labelledby="order-recommendations-title" data-order-recommendations hidden>
-                <div class="order-recommendations-heading"><h2 id="order-recommendations-title">Que tal acrescentar?</h2><p>Complete seu pedido com uma opção da vitrine.</p></div>
-                <div class="order-recommendations-grid">
-                    <?php foreach ($recommendations as $recommendation): $startingPrice = min(array_column($recommendation['variants'], 'price_cents')); ?>
-                        <article class="order-recommendation" data-recommendation-card data-public-product-id="<?= e($recommendation['id']) ?>" hidden>
-                            <img src="<?= e($recommendation['image']) ?>" alt="" width="160" height="112" loading="lazy">
-                            <div><h3><?= e($recommendation['name']) ?></h3><p>A partir de <strong><?= e($formatPrice($startingPrice)) ?></strong></p><a href="/produto/<?= e($recommendation['id']) ?>">Ver produto</a></div>
-                        </article>
-                    <?php endforeach; ?>
-                </div>
-            </section>
-        <?php endif; ?>
         <fieldset class="service-type" data-service-type>
             <legend>Tipo de atendimento</legend>
             <label><input type="radio" name="service_type" value="pickup"><span>Retirada no local</span></label>

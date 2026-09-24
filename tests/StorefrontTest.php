@@ -12,9 +12,11 @@ use App\Core\Router;
 use App\Core\View;
 use App\Repositories\StorefrontCatalogRepository;
 use App\Repositories\StorefrontOperationsRepositoryInterface;
+use App\Repositories\StorefrontHomeHighlightsRepositoryInterface;
 use App\Services\BusinessHoursService;
 use App\Services\StorefrontCatalogService;
 use App\Services\StorefrontOperationsService;
+use App\Services\StorefrontHomeHighlightsService;
 use App\Services\WhatsAppCheckoutService;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -35,6 +37,8 @@ final class StorefrontTest extends TestCase
 
         self::assertSame(200, $home->status());
         self::assertStringContainsString('Destaque da casa', $home->body());
+        self::assertStringContainsString('class="featured-card" href="/produto/batata"', $home->body());
+        self::assertStringContainsString('class="popular-card" href="/produto/camarao"', $home->body());
         self::assertStringContainsString('/assets/images/brand/logo-sao-jorge.png', $home->body());
         self::assertStringContainsString('Aberto agora', $home->body());
         self::assertStringContainsString('Hoje até 21h30', $home->body());
@@ -55,9 +59,8 @@ final class StorefrontTest extends TestCase
         self::assertStringContainsString('data-checkout-token', $order->body());
         self::assertStringContainsString('value="pickup"', $order->body());
         self::assertStringContainsString('value="dine_in"', $order->body());
-        self::assertStringContainsString('Que tal acrescentar?', $order->body());
-        self::assertStringContainsString('data-recommendation-card', $order->body());
-        self::assertStringContainsString('Ver produto', $order->body());
+        self::assertStringNotContainsString('Que tal acrescentar?', $order->body());
+        self::assertStringNotContainsString('data-recommendation-card', $order->body());
         self::assertSame('{"status":"ok"}', $health->body());
         self::assertSame(404, $unknown->status());
     }
@@ -166,8 +169,13 @@ final class StorefrontTest extends TestCase
             public function updateBusinessHours(array $schedule): void {}
         };
         $operations = new StorefrontOperationsService($operationsRepository);
+        $highlightsRepository = new class implements StorefrontHomeHighlightsRepositoryInterface {
+            public function settings(): array { return ['featured_product_slug' => 'batata', 'popular_product_1_slug' => 'camarao', 'popular_product_2_slug' => null]; }
+            public function updateHighlights(string $featured, ?string $popular1, ?string $popular2): void {}
+        };
+        $homeHighlights = new StorefrontHomeHighlightsService($highlightsRepository, $catalog);
         $checkout = new WhatsAppCheckoutService($businessHours, $catalog, ['number' => '5527998586163'], null, $operations);
-        $app = ['view' => new View($root . '/resources/views'), 'catalog' => $catalog, 'businessHours' => $businessHours, 'storefrontOperations' => $operations, 'whatsappCheckout' => $checkout, 'request' => new Request(), 'csrf' => $csrf, 'logger' => $logger, 'router' => new Router()];
+        $app = ['view' => new View($root . '/resources/views'), 'catalog' => $catalog, 'storefrontHomeHighlights' => $homeHighlights, 'businessHours' => $businessHours, 'storefrontOperations' => $operations, 'whatsappCheckout' => $checkout, 'request' => new Request(), 'csrf' => $csrf, 'logger' => $logger, 'router' => new Router()];
 
         return require $root . '/routes/web.php';
     }

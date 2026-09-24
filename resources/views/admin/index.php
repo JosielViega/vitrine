@@ -8,8 +8,9 @@ declare(strict_types=1);
 /** @var array $dashboard */
 /** @var array $flashMessages */
 /** @var array $imageWarnings */
-$tabs = ['categories' => 'Categorias', 'subcategories' => 'Subcategorias', 'products' => 'Produtos', 'images' => 'Imagens', 'operations' => 'Funcionamento'];
+$tabs = ['categories' => 'Categorias', 'subcategories' => 'Subcategorias', 'products' => 'Produtos', 'images' => 'Imagens', 'home' => 'Home', 'operations' => 'Funcionamento'];
 $isOperations = $section === 'operations';
+$isHome = $section === 'home';
 $imageFilters = [];
 if ($section === 'images') {
     $nameSubcategoryIds = [];
@@ -49,9 +50,9 @@ if ($section === 'images') {
 <main class="admin-main">
     <div class="page-heading">
         <div>
-            <span class="eyebrow"><?= $isOperations ? 'Operação' : 'Controle de publicação' ?></span>
-            <h1><?= $isOperations ? 'Funcionamento da vitrine' : 'Visibilidade da vitrine' ?></h1>
-            <p><?= $isOperations ? 'Gerencie comunicados bloqueantes e o calendário semanal.' : 'Escolha o que aparece no cardápio público. O estado operacional é apenas informativo.' ?></p>
+            <span class="eyebrow"><?= $isOperations ? 'Operação' : ($isHome ? 'Vitrine' : 'Controle de publicação') ?></span>
+            <h1><?= $isOperations ? 'Funcionamento da vitrine' : ($isHome ? 'Destaques da Home' : 'Visibilidade da vitrine') ?></h1>
+            <p><?= $isOperations ? 'Gerencie comunicados bloqueantes e o calendário semanal.' : ($isHome ? 'Escolha os produtos que aparecem em destaque na página inicial.' : 'Escolha o que aparece no cardápio público. O estado operacional é apenas informativo.') ?></p>
         </div>
     </div>
 
@@ -68,7 +69,7 @@ if ($section === 'images') {
         <?php foreach ($tabs as $key => $label): ?>
             <a href="/admin?section=<?= e($key) ?>" class="admin-tab <?= $section === $key ? 'is-active' : '' ?>" <?= $section === $key ? 'aria-current="page"' : '' ?>>
                 <?= e($label) ?>
-                <?php if ($key !== 'operations'): ?><span><?= count($dashboard[$key]) ?></span><?php endif; ?>
+                <?php if (!in_array($key, ['home', 'operations'], true)): ?><span><?= count($dashboard[$key]) ?></span><?php endif; ?>
             </a>
         <?php endforeach; ?>
     </nav>
@@ -162,6 +163,47 @@ if ($section === 'images') {
                     </article>
                 <?php endforeach; ?>
             </div>
+        </section>
+    <?php elseif ($section === 'home'):
+        $homeDashboard = $dashboard['home'];
+        $homeSettings = $homeDashboard['settings'];
+        $homeSlots = [
+            ['field' => 'featured_product_slug', 'title' => 'Destaque da casa', 'required' => true, 'selected' => (string) $homeSettings['featured_product_slug'], 'product' => $homeDashboard['featured']],
+            ['field' => 'popular_product_1_slug', 'title' => 'Mais pedidos — posição 1', 'required' => false, 'selected' => (string) ($homeSettings['popular_product_1_slug'] ?? ''), 'product' => $homeDashboard['popular1']],
+            ['field' => 'popular_product_2_slug', 'title' => 'Mais pedidos — posição 2', 'required' => false, 'selected' => (string) ($homeSettings['popular_product_2_slug'] ?? ''), 'product' => $homeDashboard['popular2']],
+        ];
+    ?>
+        <section aria-labelledby="home-highlights-title">
+            <div class="section-heading"><div><h2 id="home-highlights-title">Produtos em destaque</h2><p>As opções incluem somente produtos disponíveis atualmente na vitrine.</p></div></div>
+            <?php foreach ($homeDashboard['warnings'] as $warning): ?><div class="flash flash-error" role="alert"><?= e($warning) ?></div><?php endforeach; ?>
+            <form class="home-highlights-form" method="post" action="/admin/home/highlights" data-home-highlights-form>
+                <input type="hidden" name="_token" value="<?= e($csrfToken) ?>">
+                <div class="home-highlights-grid">
+                    <?php foreach ($homeSlots as $slot): $selectedProduct = $slot['product']; ?>
+                        <article class="admin-card home-highlight-card" data-home-highlight-slot>
+                            <div class="item-heading"><div><span class="eyebrow">Posição na Home</span><h3><?= e($slot['title']) ?></h3></div><span class="status status-unsaved" data-highlight-unsaved hidden>Não salvo</span></div>
+                            <label class="highlight-select-label"><span>Produto</span>
+                                <select name="<?= e($slot['field']) ?>" <?= $slot['required'] ? 'required' : '' ?> data-highlight-select data-original-value="<?= e($slot['selected']) ?>">
+                                    <?php if (!$slot['required']): ?><option value="">Nenhum</option><?php else: ?><option value="" disabled>Escolha um produto</option><?php endif; ?>
+                                    <?php foreach ($homeDashboard['groups'] as $groupLabel => $products): ?>
+                                        <optgroup label="<?= e($groupLabel) ?>">
+                                            <?php foreach ($products as $option): ?>
+                                                <option value="<?= e($option['slug']) ?>" data-image="<?= e($option['image']) ?>" data-name="<?= e($option['name']) ?>" data-context="<?= e($option['context']) ?>" data-price="<?= e($option['price']) ?>" <?= $slot['selected'] === $option['slug'] ? 'selected' : '' ?>><?= e($option['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </optgroup>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                            <div class="highlight-preview" data-highlight-preview <?= $selectedProduct === null ? 'hidden' : '' ?>>
+                                <img src="<?= e($selectedProduct['image'] ?? '') ?>" alt="" width="180" height="120" data-highlight-image>
+                                <div><strong data-highlight-name><?= e($selectedProduct['name'] ?? '') ?></strong><span data-highlight-context><?= $selectedProduct === null ? '' : e($selectedProduct['category_name'] . ' › ' . $selectedProduct['subcategory']['name']) ?></span><b data-highlight-price><?= $selectedProduct === null ? '' : e('R$ ' . number_format(min(array_column($selectedProduct['variants'], 'price_cents')) / 100, 2, ',', '.')) ?></b></div>
+                            </div>
+                            <p class="highlight-empty" data-highlight-empty <?= $selectedProduct !== null ? 'hidden' : '' ?>>Nenhum produto selecionado.</p>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+                <button class="button button-primary" type="submit">Salvar destaques</button>
+            </form>
         </section>
     <?php else:
         $operations = $dashboard['operations'];

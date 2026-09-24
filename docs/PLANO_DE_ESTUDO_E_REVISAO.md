@@ -182,7 +182,8 @@ Estude GET versus POST, parâmetro de rota, 404, 401/403/409/422/500/503, redire
 
 | Service | Regra e transformação real |
 |---|---|
-| `StorefrontCatalogService` | lê três coleções, filtra, agrupa, indexa variantes, resolve imagem/editorial, featured/popular/related e addons |
+| `StorefrontCatalogService` | lê três coleções, filtra, agrupa, indexa variantes, resolve imagem/editorial e addons |
+| `StorefrontHomeHighlightsService` | valida e resolve os slugs persistidos de Destaque da casa e Mais pedidos contra o catálogo público atual |
 | `StorefrontProductGroupingService` | slug, `Meia: X`, legado `X - Meia`, alias e isolamento por subcategoria |
 | `StorefrontVisibilityService` | status efetivo no Admin e filtragem de descendentes por visibilidade do pai |
 | `AdminAuthService` | dummy hash, `password_verify`, rate limit por sessão, regeneração e identidade mínima |
@@ -349,12 +350,12 @@ products (duas linhas reais)
  -> checkout resolve novamente esse ID real
 ```
 
-`StorefrontCatalogService` também resolve categorias/subcategorias, descrição editorial, fallback de imagem, imagem gerenciada, featured, dois populares e dois relacionados. Ao final remove subcategorias que ficaram sem produtos.
+`StorefrontCatalogService` também resolve categorias/subcategorias, descrição editorial, fallback de imagem, imagem gerenciada e relacionados. Ao final remove subcategorias que ficaram sem produtos. Featured e populares efetivos são resolvidos por `StorefrontHomeHighlightsService` a partir da tabela `storefront_home_highlights`; os valores em `config/storefront.php` são somente seed/default de primeira instalação.
 
 **Exercícios**
 
 - Encontre no teste o caso que proíbe agrupamento entre subcategorias.
-- Explique por que featured/popular/related guardam slugs, não IDs reais.
+- Explique por que os destaques persistidos e os relacionados usam slugs públicos, não IDs de variantes.
 - Simule no papel o que ocorre se duas subcategorias gerarem o mesmo slug público.
 
 ## Fase 4 — acréscimos

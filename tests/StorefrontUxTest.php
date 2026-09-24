@@ -56,15 +56,29 @@ final class StorefrontUxTest extends TestCase
         self::assertStringContainsString("window.addEventListener('beforeunload'", $source);
     }
 
-    public function testOrderJavascriptFiltersConceptsLimitsTwoAndHidesEmptySection(): void
+    public function testOrderRecommendationsWereRemovedCompletely(): void
     {
         $source = $this->appJavascript();
+        $order = (string) file_get_contents(dirname(__DIR__) . '/resources/views/pages/order.php');
+        $layout = (string) file_get_contents(dirname(__DIR__) . '/resources/views/layouts/app.php');
 
-        self::assertStringContainsString('new Set(cart.map((item) => item.publicProductId))', $source);
-        self::assertStringContainsString('card.dataset.publicProductId', $source);
-        self::assertStringContainsString('.slice(0, 2)', $source);
-        self::assertStringContainsString('recommendations.hidden = cart.length === 0 || eligible.length === 0', $source);
-        self::assertStringContainsString('renderRecommendations();', $source);
+        self::assertStringNotContainsString('renderRecommendations', $source);
+        self::assertStringNotContainsString('data-recommendation-card', $order);
+        self::assertStringNotContainsString('Que tal acrescentar?', $order);
+        self::assertStringNotContainsString('order-enhancements.css', $layout);
+        self::assertFileDoesNotExist(dirname(__DIR__) . '/public/assets/css/order-enhancements.css');
+    }
+
+    public function testAdminHighlightsPreviewMarksUnsavedChanges(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/admin.js');
+
+        self::assertStringContainsString('[data-home-highlight-slot]', $source);
+        self::assertStringContainsString('select.selectedOptions[0]', $source);
+        self::assertStringContainsString('option.dataset.image', $source);
+        self::assertStringContainsString('option.dataset.context', $source);
+        self::assertStringContainsString('option.dataset.price', $source);
+        self::assertStringContainsString('unsaved.hidden = select.value === select.dataset.originalValue', $source);
     }
 
     public function testCheckoutUsesSynchronousAuxiliaryWindowAndClearsOnlyOnAuthoritativeSuccess(): void

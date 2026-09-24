@@ -14,7 +14,6 @@ declare(strict_types=1);
     <meta name="theme-color" content="#0b0806">
     <title><?= e($title ?? 'Bar e Lanchonete São Jorge') ?></title>
     <link rel="stylesheet" href="/assets/css/app.css">
-    <link rel="stylesheet" href="/assets/css/order-enhancements.css">
     <script src="/assets/js/app.js" defer></script>
 </head>
 <body>

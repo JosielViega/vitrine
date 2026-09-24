@@ -12,6 +12,7 @@ use App\Core\Session;
 use App\Core\View;
 use App\Repositories\AdminAuthRepositoryInterface;
 use App\Repositories\StorefrontCatalogRepository;
+use App\Repositories\StorefrontHomeHighlightsRepositoryInterface;
 use App\Repositories\StorefrontProductImageRepositoryInterface;
 use App\Repositories\StorefrontOperationsRepositoryInterface;
 use App\Services\AdminAuthService;
@@ -20,6 +21,7 @@ use App\Services\ProductImageProcessor;
 use App\Services\ProductImageService;
 use App\Services\ProductImageStorage;
 use App\Services\StorefrontCatalogService;
+use App\Services\StorefrontHomeHighlightsService;
 use App\Services\StorefrontOperationsService;
 use App\Services\StorefrontProductGroupingService;
 use App\Services\StorefrontVisibilityService;
@@ -31,6 +33,7 @@ final class AdminRouteTest extends TestCase
     protected function setUp(): void
     {
         $_SESSION = [];
+        AdminRouteHomeHighlightsRepository::$settings = ['featured_product_slug' => 'batata', 'popular_product_1_slug' => 'camarao', 'popular_product_2_slug' => null];
     }
 
     public function testAdminWithoutLoginRedirectsToLogin(): void
@@ -153,6 +156,73 @@ final class AdminRouteTest extends TestCase
         self::assertStringNotContainsString('Funcionamento <span>', $response->body());
     }
 
+    public function testHomeTabRendersPublicOptionsCurrentSelectionAndPreviewContract(): void
+    {
+        $this->authenticateSession();
+        $request = new Request(queryParams: ['section' => 'home'], server: ['REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/admin?section=home']);
+        $response = $this->dispatch($request);
+
+        self::assertSame(200, $response->status());
+        self::assertStringContainsString('Destaques da Home', $response->body());
+        self::assertStringContainsString('action="/admin/home/highlights"', $response->body());
+        self::assertStringContainsString('name="_token"', $response->body());
+        self::assertStringContainsString('<optgroup label="Comidas › Porções">', $response->body());
+        self::assertStringContainsString('value="batata"', $response->body());
+        self::assertStringContainsString('value="camarao"', $response->body());
+        self::assertStringContainsString('value=""', $response->body());
+        self::assertStringContainsString('>Nenhum</option>', $response->body());
+        self::assertStringContainsString('data-image="/fallback.jpg"', $response->body());
+        self::assertStringContainsString('data-highlight-preview', $response->body());
+        self::assertStringContainsString('data-highlight-unsaved hidden', $response->body());
+        self::assertStringNotContainsString('Bacon</option>', $response->body());
+        self::assertStringNotContainsString('Home <span>', $response->body());
+    }
+
+    public function testHomeHighlightsPostRequiresAuthenticationAndCsrf(): void
+    {
+        $unauthenticated = $this->dispatch($this->request('POST', '/admin/home/highlights'));
+        self::assertSame(303, $unauthenticated->status());
+        self::assertSame('/admin/login', $unauthenticated->headers()['Location']);
+
+        $this->authenticateSession();
+        $invalidCsrf = $this->dispatch($this->request('POST', '/admin/home/highlights', ['_token' => 'invalid']));
+        self::assertSame(403, $invalidCsrf->status());
+    }
+
+    public function testValidHomeHighlightsPostPersistsAndUsesPrg(): void
+    {
+        $this->authenticateSession();
+        $session = new Session(false);
+        $csrf = new Csrf($session);
+        $response = $this->dispatch($this->request('POST', '/admin/home/highlights', [
+            '_token' => $csrf->token(),
+            'featured_product_slug' => 'camarao',
+            'popular_product_1_slug' => 'batata',
+            'popular_product_2_slug' => '',
+        ]), $session, $csrf);
+
+        self::assertSame(303, $response->status());
+        self::assertSame('/admin?section=home', $response->headers()['Location']);
+        self::assertSame(['featured_product_slug' => 'camarao', 'popular_product_1_slug' => 'batata', 'popular_product_2_slug' => null], AdminRouteHomeHighlightsRepository::$settings);
+    }
+
+    public function testManipulatedDuplicateHomeHighlightsPostReturnsValidationError(): void
+    {
+        $this->authenticateSession();
+        $session = new Session(false);
+        $csrf = new Csrf($session);
+        $request = new Request(parsedBody: [
+            '_token' => $csrf->token(),
+            'featured_product_slug' => 'batata',
+            'popular_product_1_slug' => 'batata',
+            'popular_product_2_slug' => '',
+        ], server: ['REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/admin/home/highlights', 'HTTP_ACCEPT' => 'application/json']);
+        $response = $this->dispatch($request, $session, $csrf);
+
+        self::assertSame(422, $response->status());
+        self::assertFalse(json_decode($response->body(), true, 8, JSON_THROW_ON_ERROR)['ok']);
+    }
+
     public function testOperationsPostsRequireAuthenticationAndCsrf(): void
     {
         $unauthenticated = $this->dispatch($this->request('POST', '/admin/operations/notice'));
@@ -218,10 +288,17 @@ final class AdminRouteTest extends TestCase
         $auth = new AdminAuthService(new AdminRouteAuthRepository(), $session);
         $visibility = new StorefrontVisibilityService(new StorefrontVisibilityFakeRepository());
         $catalog = new StorefrontCatalogService(new class implements StorefrontCatalogRepository {
-            public function activeCategories(): array { return []; }
-            public function activeSubcategories(): array { return []; }
-            public function activeProducts(): array { return []; }
-        }, ['fallback_image' => '/fallback.jpg']);
+            public function activeCategories(): array { return [['id' => 1, 'name' => 'Comidas', 'sort_order' => 0, 'active' => 1]]; }
+            public function activeSubcategories(): array { return [['id' => 1, 'category_id' => 1, 'name' => 'Porções', 'sort_order' => 0, 'active' => 1]]; }
+            public function activeProducts(): array {
+                return [
+                    ['id' => 1, 'subcategory_id' => 1, 'category_id' => 1, 'name' => 'Batata', 'price_cents' => 3000, 'kind' => 'kitchen', 'active' => 1],
+                    ['id' => 2, 'subcategory_id' => 1, 'category_id' => 1, 'name' => 'Camarão', 'price_cents' => 7500, 'kind' => 'kitchen', 'active' => 1],
+                    ['id' => 117, 'subcategory_id' => 1, 'category_id' => 1, 'name' => 'Bacon', 'price_cents' => 600, 'kind' => 'regular', 'active' => 1],
+                ];
+            }
+        }, ['addons' => ['product_ids' => [117], 'eligible_subcategories' => ['porcoes']], 'fallback_image' => '/fallback.jpg']);
+        $homeHighlights = new StorefrontHomeHighlightsService(new AdminRouteHomeHighlightsRepository(), $catalog);
         $businessHours = new BusinessHoursService(require $root . '/config/business.php');
         $operations = new StorefrontOperationsService(new AdminRouteOperationsRepository());
         $logger = new Logger(sys_get_temp_dir() . '/vitrine-admin-route-test-logs');
@@ -234,6 +311,7 @@ final class AdminRouteTest extends TestCase
             'adminAuth' => $auth,
             'storefrontVisibility' => $visibility,
             'productImages' => $productImages,
+            'storefrontHomeHighlights' => $homeHighlights,
             'catalog' => $catalog,
             'businessHours' => $businessHours,
             'storefrontOperations' => $operations,
@@ -251,6 +329,16 @@ final class AdminRouteTest extends TestCase
         $_SESSION['admin_authenticated'] = true;
         $_SESSION['admin_user_id'] = 7;
         $_SESSION['admin_username'] = 'manager';
+    }
+}
+
+final class AdminRouteHomeHighlightsRepository implements StorefrontHomeHighlightsRepositoryInterface
+{
+    public static array $settings = ['featured_product_slug' => 'batata', 'popular_product_1_slug' => 'camarao', 'popular_product_2_slug' => null];
+    public function settings(): array { return self::$settings; }
+    public function updateHighlights(string $featured, ?string $popular1, ?string $popular2): void
+    {
+        self::$settings = ['featured_product_slug' => $featured, 'popular_product_1_slug' => $popular1, 'popular_product_2_slug' => $popular2];
     }
 }
 

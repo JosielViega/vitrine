@@ -14,13 +14,15 @@ use App\Services\AdminAuthService;
 use App\Services\ProductImageException;
 use App\Services\ProductImageService;
 use App\Services\StorefrontVisibilityService;
+use App\Services\StorefrontHomeHighlightsService;
+use App\Services\StorefrontHomeHighlightsValidationException;
 use App\Services\StorefrontOperationsService;
 use App\Services\StorefrontOperationsValidationException;
 use Throwable;
 
 final class AdminController
 {
-    private const SECTIONS = ['categories', 'subcategories', 'products', 'images', 'operations'];
+    private const SECTIONS = ['categories', 'subcategories', 'products', 'images', 'home', 'operations'];
     private const TYPES = ['category', 'subcategory', 'product'];
 
     public function __construct(
@@ -31,6 +33,7 @@ final class AdminController
         private readonly AdminAuthService $auth,
         private readonly StorefrontVisibilityService $visibility,
         private readonly ProductImageService $productImages,
+        private readonly StorefrontHomeHighlightsService $homeHighlights,
         private readonly Logger $logger,
         private readonly ?StorefrontOperationsService $operations = null,
     ) {
@@ -45,6 +48,7 @@ final class AdminController
         $section = $this->section($this->request->query('section'));
         $dashboard = $this->visibility->dashboard();
         $dashboard['images'] = $this->productImages->groups();
+        $dashboard['home'] = $this->homeHighlights->dashboard();
         if ($this->operations !== null) {
             $dashboard['operations'] = $this->operations->dashboard();
         }
@@ -140,6 +144,32 @@ final class AdminController
         }
 
         return $this->noStore(Response::redirect('/admin?section=images', 303));
+    }
+
+    public function updateHomeHighlights(): Response
+    {
+        if (!$this->auth->check()) {
+            return $this->respondUnauthorized();
+        }
+        if (!$this->csrf->verify($this->request->input('_token'))) {
+            return $this->noStore(Response::html('Acesso negado.', 403));
+        }
+
+        try {
+            $this->homeHighlights->update(
+                $this->request->input('featured_product_slug', ''),
+                $this->request->input('popular_product_1_slug', ''),
+                $this->request->input('popular_product_2_slug', ''),
+            );
+            $this->session->flash('success', 'Destaques da Home atualizados.');
+        } catch (StorefrontHomeHighlightsValidationException $exception) {
+            return $this->respondError($exception->getMessage(), 422, 'home');
+        } catch (Throwable $exception) {
+            $this->logger->error('Unexpected storefront home highlights update failure.', ['exception' => $exception::class]);
+            return $this->respondError('Não foi possível salvar os destaques da Home.', 500, 'home');
+        }
+
+        return $this->noStore(Response::redirect('/admin?section=home', 303));
     }
 
     public function updateNotice(): Response

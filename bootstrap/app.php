@@ -12,6 +12,7 @@ use App\Core\Router;
 use App\Core\Session;
 use App\Core\View;
 use App\Repositories\AdminAuthRepository;
+use App\Repositories\StorefrontHomeHighlightsRepository;
 use App\Repositories\StorefrontProductImageRepository;
 use App\Repositories\StorefrontProductRepository;
 use App\Repositories\StorefrontOperationsRepository;
@@ -22,6 +23,7 @@ use App\Services\ProductImageProcessor;
 use App\Services\ProductImageService;
 use App\Services\ProductImageStorage;
 use App\Services\StorefrontCatalogService;
+use App\Services\StorefrontHomeHighlightsService;
 use App\Services\StorefrontOperationsService;
 use App\Services\StorefrontProductGroupingService;
 use App\Services\StorefrontVisibilityService;
@@ -61,6 +63,10 @@ $storefrontOperations = new StorefrontOperationsService(
 $storefrontPresentation = require $root . '/config/storefront.php';
 $productGrouping = new StorefrontProductGroupingService((array) ($storefrontPresentation['variant_aliases'] ?? []));
 $catalog = new StorefrontCatalogService(new StorefrontProductRepository($database), $storefrontPresentation, $productGrouping);
+$storefrontHomeHighlights = new StorefrontHomeHighlightsService(
+    new StorefrontHomeHighlightsRepository($database),
+    $catalog,
+);
 $productImages = new ProductImageService(
     new StorefrontProductImageRepository($database),
     $productGrouping,
@@ -75,6 +81,7 @@ $whatsappCheckout = new WhatsAppCheckoutService($businessHours, $catalog, $whats
 return [
     'config' => $appConfig,
     'catalog' => $catalog,
+    'storefrontHomeHighlights' => $storefrontHomeHighlights,
     'adminAuth' => $adminAuth,
     'storefrontVisibility' => $storefrontVisibility,
     'storefrontOperations' => $storefrontOperations,

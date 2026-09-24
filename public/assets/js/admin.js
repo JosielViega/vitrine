@@ -74,6 +74,28 @@
         previewUrls.clear();
     });
 
+    document.querySelectorAll('[data-home-highlight-slot]').forEach((slot) => {
+        const select = slot.querySelector('[data-highlight-select]');
+        const preview = slot.querySelector('[data-highlight-preview]');
+        const emptyPreview = slot.querySelector('[data-highlight-empty]');
+        const unsaved = slot.querySelector('[data-highlight-unsaved]');
+        if (!select || !preview || !emptyPreview || !unsaved) return;
+
+        select.addEventListener('change', () => {
+            const option = select.selectedOptions[0];
+            const hasProduct = Boolean(option?.value);
+            preview.hidden = !hasProduct;
+            emptyPreview.hidden = hasProduct;
+            if (hasProduct) {
+                preview.querySelector('[data-highlight-image]').src = option.dataset.image || '';
+                preview.querySelector('[data-highlight-name]').textContent = option.dataset.name || option.textContent;
+                preview.querySelector('[data-highlight-context]').textContent = option.dataset.context || '';
+                preview.querySelector('[data-highlight-price]').textContent = option.dataset.price || '';
+            }
+            unsaved.hidden = select.value === select.dataset.originalValue;
+        });
+    });
+
     document.querySelectorAll('[data-image-remove]').forEach((form) => {
         form.addEventListener('submit', (event) => {
             if (!window.confirm('Remover a imagem cadastrada deste produto?')) event.preventDefault();

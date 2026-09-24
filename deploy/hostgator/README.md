@@ -82,3 +82,11 @@ O mirror representa apenas arquivos que podem ser atualizados. Ele não represen
 ### Funcionamento da Vitrine
 
 Antes de publicar a versão que contém o controle de funcionamento, siga a ordem documentada em docs/STOREFRONT_OPERATIONS.md: backup, applicator local ao ambiente, conferência do seed, deploy, validação no Admin e smoke tests. Não aplique o schema de produção sem autorização explícita.
+
+### Destaques da Home
+
+O código dos destaques depende da tabela `storefront_home_highlights`. Antes de publicar essa versão, siga `docs/HOME_HIGHLIGHTS.md`: faça backup, disponibilize e execute `composer storefront:home-schema`, confirme o seed da linha `id = 1` e somente depois publique o código. Em seguida, confira `Admin > Home` e a Home pública. Não execute o applicator em produção sem autorização explícita.
+
+### Destaques da Home
+
+O código dos destaques depende da tabela `storefront_home_highlights`. Antes de publicar essa versão, siga `docs/HOME_HIGHLIGHTS.md`: faça backup, disponibilize e execute `composer storefront:home-schema`, confirme o seed da linha `id = 1` e somente depois publique o código. Em seguida, confira `Admin > Home` e a Home pública. Não execute o applicator em produção sem autorização explícita.

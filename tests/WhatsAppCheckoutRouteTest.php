@@ -11,8 +11,10 @@ use App\Core\Router;
 use App\Core\Session;
 use App\Core\View;
 use App\Repositories\StorefrontCatalogRepository;
+use App\Repositories\StorefrontHomeHighlightsRepositoryInterface;
 use App\Services\BusinessHoursService;
 use App\Services\StorefrontCatalogService;
+use App\Services\StorefrontHomeHighlightsService;
 use App\Services\WhatsAppCheckoutService;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -99,7 +101,11 @@ final class WhatsAppCheckoutRouteTest extends TestCase
         $catalog = $this->catalog();
         $logger = new Logger(sys_get_temp_dir() . '/vitrine-checkout-route-test-logs');
         $checkout = new WhatsAppCheckoutService($businessHours, $catalog, ['number' => '5527998586163'], $logger);
-        $app = ['view' => new View($root . '/resources/views'), 'catalog' => $catalog, 'businessHours' => $businessHours, 'whatsappCheckout' => $checkout, 'request' => $request, 'csrf' => $csrf, 'logger' => $logger, 'router' => new Router()];
+        $highlightsRepository = new class implements StorefrontHomeHighlightsRepositoryInterface {
+            public function settings(): array { return ['featured_product_slug' => 'camarao-c-batata-e-aipim', 'popular_product_1_slug' => null, 'popular_product_2_slug' => null]; }
+            public function updateHighlights(string $featured, ?string $popular1, ?string $popular2): void {}
+        };
+        $app = ['view' => new View($root . '/resources/views'), 'catalog' => $catalog, 'storefrontHomeHighlights' => new StorefrontHomeHighlightsService($highlightsRepository, $catalog), 'businessHours' => $businessHours, 'whatsappCheckout' => $checkout, 'request' => $request, 'csrf' => $csrf, 'logger' => $logger, 'router' => new Router()];
         $router = require $root . '/routes/web.php';
 
         return $router->dispatch($request);
